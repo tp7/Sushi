@@ -1,7 +1,5 @@
 import cv2
-import math
 import numpy as np
-from scipy.io import wavfile
 from chunk import Chunk
 import struct
 
@@ -102,7 +100,7 @@ class WavStream(object):
                 arrays.append((data / 256.0).astype(np.uint8))
 
             seconds_read += chunk
-        
+
         self.data = np.concatenate(arrays, axis=1)
         file.close()
 

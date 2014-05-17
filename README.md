@@ -33,15 +33,12 @@ For the time being, the script is provided as-is. I don't know what exact versio
 
 1. Windows, but it probably will run on most other operation systems
 2. [Python 2.7.6][1] (won't run on 3.x)
-3. [SciPy 0.14.0][2]
-4. [NumPy 1.8.1][3]
-5. [OpenCV 2.4.9][4] (only `imgproc` module is used)
+4. [NumPy 1.8.1][2]
+5. [OpenCV 2.4.9][3] (only `imgproc` module is used)
 
 
 ### Limitations
-Only WAV audio files can be read, this script will not be able to decode anything. 24-bit WAVs and large WAVs  will most likely fail because the script tries to load the whole file at once (if this happens, you can try `--sample-type uint8` to save some RAM). I'm testing it on 25 minutes 300MB WAV files.
-
-No keyframes snapping is performed.  
+No keyframes snapping is performed. 
 
 This script will never be able to property handle frame-by-frame typesetting. If underlying video stream changes (e.g. has different telecine pattern), you might get incorrect output.
 
@@ -49,6 +46,5 @@ In short, while this might be safe for immediate viewing, you probably shouldn't
 
 
   [1]: https://www.python.org/download/releases/2.7.6/
-  [2]: http://www.scipy.org/
-  [3]: http://www.numpy.org/
-  [4]: http://opencv.org/
+  [2]: http://www.numpy.org/
+  [3]: http://opencv.org/
