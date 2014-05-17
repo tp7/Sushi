@@ -51,7 +51,7 @@ class DownmixedWavFile(object):
         if self.sample_width == 2:
             unpacked = np.fromstring(data, dtype=np.int16)
         elif self.sample_width == 3:
-            s = ''.join(['\0' + data[i:i+3] for i in xrange(0, len(data), 3)])
+            s = '\0' + '\0'.join(data[i:i+3] for i in xrange(0, len(data), 3))
             unpacked = np.fromstring(s, dtype=np.int32) >> 8
         else:
             raise Exception('Unsupported sample width: {0}'.format(self.sample_width))
@@ -102,7 +102,7 @@ class WavStream(object):
                 arrays.append((data / 256.0).astype(np.uint8))
 
             seconds_read += chunk
-
+        
         self.data = np.concatenate(arrays, axis=1)
         file.close()
 
