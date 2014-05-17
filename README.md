@@ -20,7 +20,7 @@ Of course it won't search the whole stream for every line. Instead, a small wind
 
 Also, the script won't attempt to search for a line if a line with identical start and end times has been already processed. This is very useful for typesetting and can significantly improve performance, but you can still disable it with the `--no-fast-skip` switch.
 
-Then, the script will try to split all lines into groups. It can either try to build these groups automatically (lines with similar shift are grouped), or get them from XML chapters, provided with `--chapters` argument. This is done because it is very unlikely for every line to have its own shift (unless there's some frame rate problems). Shift values of all events in every group are used to calculate weighted average (where weight is the coefficient of similarity of audio streams, calculated before), which is then applied to every line on the group. Of course you can disable grouping with `--no-grouping` switch.
+Then, the script will try to split all lines into groups. It can either try to build these groups automatically (lines with similar shift are grouped), or get them from chapters (XML or OGM), provided with `--chapters` argument. This is done because it is very unlikely for every line to have its own shift (unless there's some frame rate problems). Shift values of all events in every group are used to calculate weighted average (where weight is the coefficient of similarity of audio streams, calculated before), which is then applied to every line on the group. Of course you can disable grouping with `--no-grouping` switch.
 
 ### Usage
 The minimal command line looks like this:
@@ -39,7 +39,7 @@ For the time being, the script is provided as-is. I don't know what exact versio
 
 
 ### Limitations
-Only XML chapters are supported right now. Only WAV audio files can be read, this script will not be able to decode anything. 24-bit WAVs and large WAVs  will most likely fail because the script tries to load the whole file at once (if this happens, you can try `--sample-type uint8` to save some RAM). I'm testing it on 25 minutes 300MB WAV files.
+Only WAV audio files can be read, this script will not be able to decode anything. 24-bit WAVs and large WAVs  will most likely fail because the script tries to load the whole file at once (if this happens, you can try `--sample-type uint8` to save some RAM). I'm testing it on 25 minutes 300MB WAV files.
 
 No keyframes snapping is performed.  
 

@@ -190,7 +190,10 @@ def run(args):
 
     if args.grouping:
         if args.chapters_file:
-            times = chapters.get_xml_start_times(args.chapters_file)
+            if get_extension(args.chapters_file) == '.xml':
+                times = chapters.get_xml_start_times(args.chapters_file)
+            else:
+                times = chapters.get_ogm_start_times(args.chapters_file)
             groups = groups_from_chapters(events, times)
         else:
             groups = detect_groups(events)
@@ -223,7 +226,7 @@ def create_arg_parser():
 
     # files
     parser.add_argument('--chapters', default=None, dest='chapters_file', metavar='file',
-                        help='Source XML chapters')
+                        help='Source XML or OGM chapters')
     parser.add_argument('--src-audio', required=True, dest="src_audio", metavar='file',
                         help='Source audio WAV')
     parser.add_argument('--dst-audio', required=True, dest="dst_audio", metavar='file',
