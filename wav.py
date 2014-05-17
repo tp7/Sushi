@@ -50,7 +50,7 @@ class DownmixedWavFile(object):
             unpacked = np.fromstring(data, dtype=np.int16)
         elif self.sample_width == 3:
             s = '\0' + '\0'.join(data[i:i+3] for i in xrange(0, len(data), 3))
-            unpacked = np.fromstring(s, dtype=np.int32) >> 8
+            unpacked = np.fromstring(s, dtype=np.int32) >> 16  # convert it to 16bits while at it
         else:
             raise Exception('Unsupported sample width: {0}'.format(self.sample_width))
 
@@ -89,12 +89,13 @@ class WavStream(object):
         while seconds_read < total_seconds:
             data = file.readframes(int(chunk*file.framerate))
             new_length = int(round(len(data) * downsample_rate))
-            data = np.array(data, ndmin=2)
+
+            data = np.array(data, ndmin=2, dtype=np.uint16) # signed are treated as unsigned, this is important
             data = cv2.resize(data, (new_length, 1), interpolation=cv2.INTER_NEAREST)
 
             if sample_type == 'float32':
                 # precise but eats memory
-                arrays.append(data.astype(np.float32) / (32768.0 if file.sample_width == 2 else 8388608.0))
+                arrays.append(data.astype(np.float32) / 65536.0)
             else:
                 # less precise but more memory efficient
                 arrays.append((data / 256.0).astype(np.uint8))
