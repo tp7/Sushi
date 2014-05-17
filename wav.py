@@ -1,7 +1,9 @@
+import logging
 import cv2
 import numpy as np
 from chunk import Chunk
 import struct
+from time import time
 
 WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_EXTENSIBLE = 0xFFFE
@@ -49,8 +51,8 @@ class DownmixedWavFile(object):
         if self.sample_width == 2:
             unpacked = np.fromstring(data, dtype=np.int16)
         elif self.sample_width == 3:
-            s = '\0' + '\0'.join(data[i:i+3] for i in xrange(0, len(data), 3))
-            unpacked = np.fromstring(s, dtype=np.int32) >> 16  # convert it to 16bits while at it
+            s = ''.join([data[i:i+2] for i in xrange(1, len(data), 3)]) # convert it to 16bits by dropping one byte
+            unpacked = np.fromstring(s, dtype=np.int16)
         else:
             raise Exception('Unsupported sample width: {0}'.format(self.sample_width))
 
@@ -71,6 +73,7 @@ class DownmixedWavFile(object):
             raise Exception('unknown format: {0}'.format(wFormatTag))
         self.frame_size = self.channels_count * self.sample_width
 
+
 class WavStream(object):
     def __init__(self, path, sample_rate=12000, sample_type='float32'):
         if sample_type not in ('float32', 'uint8'):
@@ -79,13 +82,14 @@ class WavStream(object):
         file = DownmixedWavFile(path)
         total_seconds = file.frames_count / float(file.framerate)
         downsample_rate = sample_rate / float(file.framerate)
-
+        
         self.sample_count = int(total_seconds * sample_rate)
         self.sample_rate = sample_rate
 
         seconds_read = 0
         chunk = 1  # one second, seems to be the fastest
         arrays = []
+        before_read = time()
         while seconds_read < total_seconds:
             data = file.readframes(int(chunk*file.framerate))
             new_length = int(round(len(data) * downsample_rate))
@@ -104,6 +108,7 @@ class WavStream(object):
 
         self.data = np.concatenate(arrays, axis=1)
         file.close()
+        logging.debug('Done reading WAV in {0}s'.format(time() - before_read))
 
     @property
     def duration_seconds(self):
