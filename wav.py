@@ -1,4 +1,5 @@
 import cv2
+import math
 import numpy as np
 from scipy.io import wavfile
 from chunk import Chunk
@@ -7,9 +8,10 @@ import struct
 WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_EXTENSIBLE = 0xFFFE
 
-class WavFile(object):
+class DownmixedWavFile(object):
     def __init__(self, path):
-        super(WavFile, self).__init__()
+        super(DownmixedWavFile, self).__init__()
+        self._file = None
         self._file = open(path, 'rb')
         try:
             riff = Chunk(self._file, bigendian=False)
@@ -45,18 +47,21 @@ class WavFile(object):
     def readframes(self, count):
         if not count:
             return ''
+        data = self._data_chunk.read(count * self.frame_size)
         if self.sample_width == 2:
-            return self._data_chunk.read(count * self.frame_size)
-            # return struct.unpack('<{0}h'.format(count*self.channels_count), data)
+            unpacked = np.fromstring(data, dtype=np.int16)
         elif self.sample_width == 3:
-            s = ''
-            for x in xrange(count):
-                frame = self._data_chunk.read(self.frame_size)
-                for c in xrange(0,3*self.channels_count, 3):
-                    s += '\0' + frame[c:(c+3)]
+            s = ''.join(['\0' + data[i:i+3] for i in xrange(0, len(data), 3)])
+            unpacked = np.fromstring(s, dtype=np.int32) >> 8
+        else:
+            raise Exception('Unsupported sample width: {0}'.format(self.sample_width))
 
-            unpacked = struct.unpack('<{0}i'.format(count*self.channels_count), s)
-            return [x >> 8 for x in unpacked]
+        if self.channels_count == 1:
+            return np.array(unpacked, dtype=np.float64)
+        elif self.channels_count == 2:
+            even = unpacked[::2]
+            odd = unpacked[1::2]
+            return (even + odd) / 2.0
 
 
     def _read_fmt_chunk(self, chunk):
@@ -68,28 +73,42 @@ class WavFile(object):
             raise Exception('unknown format: {0}'.format(wFormatTag))
         self.frame_size = self.channels_count * self.sample_width
 
-
 class WavStream(object):
     def __init__(self, path, sample_rate=12000, sample_type='float32'):
-        rate, data = wavfile.read(path)
-        data = np.array(data[:, 0], ndmin=2, dtype=np.uint16)
-        self.samples_count = int(len(data[0]) / float(rate) * sample_rate)
+        if sample_type not in ('float32', 'uint8'):
+            raise RuntimeError('Unknown sample type of WAV stream, must be uint8 or float32')
+
+        file = DownmixedWavFile(path)
+        total_seconds = file.frames_count / float(file.framerate)
+        downsample_rate = sample_rate / float(file.framerate)
+
+        self.sample_count = int(total_seconds * sample_rate)
         self.sample_rate = sample_rate
 
-        if sample_type == 'float32':
-            # precise but eats memory
-            data = cv2.resize(data, (self.samples_count, 1))
-            self.data = data.astype(np.float32) / 32768.0
-        elif sample_type == 'uint8':
-            # less precise but more memory efficient
-            data = (data >> 8).astype(np.uint8)
-            self.data = cv2.resize(data, (self.samples_count, 1))
-        else:
-            raise RuntimeError('Unknown sample type of WAV stream, must be uint8 or float32')
+        seconds_read = 0
+        chunk = 1  # one second, seems to be the fastest
+        arrays = []
+        while seconds_read < total_seconds:
+            data = file.readframes(int(chunk*file.framerate))
+            new_length = int(round(len(data) * downsample_rate))
+            data = np.array(data, ndmin=2)
+            data = cv2.resize(data, (new_length, 1), interpolation=cv2.INTER_NEAREST)
+
+            if sample_type == 'float32':
+                # precise but eats memory
+                arrays.append(data.astype(np.float32) / (32768.0 if file.sample_width == 2 else 8388608.0))
+            else:
+                # less precise but more memory efficient
+                arrays.append((data / 256.0).astype(np.uint8))
+
+            seconds_read += chunk
+
+        self.data = np.concatenate(arrays, axis=1)
+        file.close()
 
     @property
     def duration_seconds(self):
-        return self.samples_count / self.sample_rate
+        return self.sample_count / self.sample_rate
 
     def get_substream(self, start, end):
         start_off = self.to_number_of_samples(start)
@@ -101,7 +120,7 @@ class WavStream(object):
 
     def find_substream(self, pattern, **kwargs):
         start_time = max(kwargs.get('start_time', 0.0), 0.0)
-        end_time = max(kwargs.get('end_time', self.samples_count), 0.0)
+        end_time = max(kwargs.get('end_time', self.sample_count), 0.0)
 
         start_sample = self.to_number_of_samples(start_time)
         end_sample = self.to_number_of_samples(end_time) + len(pattern[0])
@@ -111,15 +130,3 @@ class WavStream(object):
         min_idx = result.argmin(axis=1)[0]
 
         return result[0][min_idx], start_time + (min_idx / float(self.sample_rate))
-
-
-# file = WavFile(r"H:\!Ongoing\shiftass\maou\[FFF] Hataraku Maou-sama! - 01 [DEF4B21E].wav")
-# file = WavFile(r"H:\[ANE] Koe de Oshigoto! [BDRip 1080p x264 FLAC]\[ANE] Koe de Oshigoto! - Creditless Opening [BDRip 1080p x264 FLAC].wav")
-# print(file.getsampwidth())
-# c = file.readframes(file.frames_count)
-# print(len(c))
-# print(file.readframes(10000))
-#
-# def write_wav(float_array, sample_rate, path):
-#     data = (float_array * 32768.0).astype(np.int16)
-#     wavfile.write(path, sample_rate, data[0])
