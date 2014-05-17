@@ -106,35 +106,35 @@ class AssEvent(object):
 class AssScript(object):
     def __init__(self, path):
         super(AssScript, self).__init__()
-        try:
-            with codecs.open(path, encoding='utf-8-sig') as file:
-                lines = file.read().splitlines()
-        except IOError:
-            logging.critical("Script at path %s wasn't found" % path)
-            sys.exit(2)
-
-        #expect script info
         self.script_info = []
         self.styles = []
         self.events = []
         parse_function = None
 
-        for line in lines:
-            if not line:
-                continue
-            low = line.lower().strip()
-            if low == u'[script info]':
-                parse_function = self.parse_script_info_line
-            elif low == u'[v4+ styles]':
-                parse_function = self.parse_styles_line
-            elif low == u'[events]':
-                parse_function = self.parse_event_line
-            elif low.startswith(u'format:'):
-                continue # ignore it
-            elif not parse_function:
-                raise RuntimeError("That's some invalid ASS script")
-            else:
-                parse_function(line)
+        try:
+            with codecs.open(path, encoding='utf-8-sig') as file:
+                for line in file:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    low = line.lower()
+                    if low == u'[script info]':
+                        parse_function = self.parse_script_info_line
+                    elif low == u'[v4+ styles]':
+                        parse_function = self.parse_styles_line
+                    elif low == u'[events]':
+                        parse_function = self.parse_event_line
+                    elif low.startswith(u'format:'):
+                        continue # ignore it
+                    elif not parse_function:
+                        raise RuntimeError("That's some invalid ASS script")
+                    else:
+                        parse_function(line)
+        except IOError:
+            logging.critical("Script {0} not found".format(path))
+            sys.exit(2)
+
+
 
     def parse_script_info_line(self, line):
         self.script_info.append(line)

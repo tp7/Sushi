@@ -9,8 +9,8 @@ def get_xml_start_times(path):
 
     result = []
     for t in times:
-        split = t.split(':')
-        result.append(int(split[0])*3600+int(split[1])*60+float(split[2]))
+        hours, minutes, seconds = map(float, t.split(':'))
+        result.append(hours * 3600 + minutes * 60 + seconds)
 
     result = sorted(result)
     if result[0] != 0:
