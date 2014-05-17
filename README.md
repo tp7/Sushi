@@ -45,7 +45,7 @@ No keyframes snapping is performed.
 
 This script will never be able to property handle frame-by-frame typesetting. If underlying video stream changes (e.g. has different telecine pattern), you might get incorrect output.
 
-In short, while this might be save for immediate viewing, you probably shouldn't use it to blindly shift subtitles for permanent storing.
+In short, while this might be safe for immediate viewing, you probably shouldn't use it to blindly shift subtitles for permanent storing.
 
 
   [1]: https://www.python.org/download/releases/2.7.6/

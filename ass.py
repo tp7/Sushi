@@ -4,50 +4,46 @@ import os.path
 import re
 import codecs
 
-class TimeOffset(object):
-    time_regex = re.compile(r'(\d+):(\d+):(\d+)\.(\d+)')
 
-    def __init__(self):
+class TimeOffset(object):
+    __slots__ = ['seconds']
+
+    def __init__(self, seconds=None):
         super(TimeOffset, self).__init__()
-        self.hours = self.minutes = self.seconds = self.centiseconds = None
+        self.seconds = seconds
 
     @staticmethod
     def from_seconds(seconds):
-        offset = TimeOffset()
-        offset.fill_from_seconds(seconds)
-        return offset
+        return TimeOffset(seconds=seconds)
 
     @staticmethod
     def from_string(string):
-        parsed = TimeOffset.time_regex.search(string)
-        offset = TimeOffset()
-        offset.hours = int(parsed.group(1))
-        offset.minutes = int(parsed.group(2))
-        offset.seconds = int(parsed.group(3))
-        offset.centiseconds = int(parsed.group(4))
-        return offset
-
-    def fill_from_seconds(self, seconds):
-        self.centiseconds = int ((seconds % 1) * 100)
-        self.seconds = int (seconds % 60)
-        self.minutes = int ((seconds // 60) % 60)
-        self.hours = int (seconds // 3600)
+        hours, minutes, seconds = map(float, string.split(':'))
+        return TimeOffset(hours*3600+minutes*60+seconds)
 
     def add_seconds(self, offset):
-        self.fill_from_seconds(max(self.total_seconds + offset, 0))
+        self.seconds += offset
 
     @property
     def total_seconds(self):
-        return self.hours * 3600 + self.minutes * 60 + self.seconds + self.centiseconds / 100.0
+        return self.seconds
+
+    def to_ass_time_string(self):
+        return u'{0}:{1:02d}:{2:02d}.{3:02d}'.format(
+            int(self.seconds // 3600),
+            int((self.seconds // 60) % 60),
+            int(self.seconds % 60),
+            int((self.seconds % 1) * 100))
 
     def __unicode__(self):
-        return u'{0}:{1:02d}:{2:02d}.{3:02d}'.format(self.hours, self.minutes, self.seconds, self.centiseconds)
+        return self.to_ass_time_string()
 
     def __repr__(self):
-        return unicode(self)
+        return self.to_ass_time_string()
 
     def __eq__(self, other):
-        return self.total_seconds == other.total_seconds
+        return self.seconds == other.seconds
+
 
 class AssEvent(object):
     def __init__(self, text):
@@ -133,7 +129,6 @@ class AssScript(object):
         except IOError:
             logging.critical("Script {0} not found".format(path))
             sys.exit(2)
-
 
 
     def parse_script_info_line(self, line):
