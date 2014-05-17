@@ -12,7 +12,7 @@ Imagine you've got a subtitle file synced to one video file, but you want to use
 The purpose of this script is to avoid all the hassle of manual syncing. It attempts to synchronize subtitles by finding similarities in audio streams. The script is very fast (not counting a few seconds to load large WAV files) and can be used right when you want to watch something.
 
 ### How it works
-You need to provide two audio files and a subtitle file (currently only .ASS) that matches one of those files. For every line in the subtitles, the script will extract corresponding audio from the source audio stream and will try to find the closest similar pattern in the destination audio stream. The shift found will be applied to the subtitles.
+You need to provide two audio files and a subtitle file (.ass or .srt) that matches one of those files. For every line in the subtitles, the script will extract corresponding audio from the source audio stream and will try to find the closest similar pattern in the destination audio stream. The shift found will be applied to the subtitles.
 
 During loading, both audio streams will be downsampled and converted to internal representation suitable for OpenCV. You can control downsampling with `--sample-rate` and `--sample-type` arguments, however it's not recommended to touch these values unless you get some problems with the defaults (12Hz, float32 samples).
 
@@ -39,7 +39,7 @@ For the time being, the script is provided as-is. I don't know what exact versio
 
 
 ### Limitations
-Only ASS scripts and XML chapters are supported right now. Only WAV audio files can be read, this script will not be able to decode anything. 24-bit WAVs and large WAVs  will most likely fail because the script tries to load the whole file at once (if this happens, you can try `--sample-type uint8` to save some RAM). I'm testing it on 25 minutes 300MB WAV files.
+Only XML chapters are supported right now. Only WAV audio files can be read, this script will not be able to decode anything. 24-bit WAVs and large WAVs  will most likely fail because the script tries to load the whole file at once (if this happens, you can try `--sample-type uint8` to save some RAM). I'm testing it on 25 minutes 300MB WAV files.
 
 No keyframes snapping is performed.  
 

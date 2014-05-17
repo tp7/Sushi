@@ -1,5 +1,5 @@
 import logging
-from ass import AssScript
+from ass import AssScript, SrtScript
 from wav import WavStream
 import sys
 from collections import namedtuple
@@ -7,6 +7,7 @@ from itertools import takewhile
 import numpy as np
 import argparse
 import chapters
+import os.path
 
 allowed_error = 0.02
 
@@ -153,11 +154,27 @@ def apply_shifts(events):
         e.apply_shift()
 
 
+def get_extension(path):
+    return (os.path.splitext(path)[1]).lower()
+
 def run(args):
     format = "%(levelname)s: %(message)s"
     logging.basicConfig(level=logging.DEBUG, format=format)
 
-    script = AssScript(args.input_script)
+    src_ext = get_extension(args.input_script)
+    dst_ext = get_extension(args.output_script)
+    if src_ext != dst_ext:
+        logging.critical("Source and destination file types don't match")
+        sys.exit(2)
+
+    if src_ext == '.ass':
+        script = AssScript(args.input_script)
+    elif src_ext == '.srt':
+        script = SrtScript(args.input_script)
+    else:
+        logging.critical('Invalid file type')
+        sys.exit(2)
+
     script.sort_by_time()
 
     src_stream = WavStream(args.src_audio, sample_rate=args.sample_rate, sample_type=args.sample_type)

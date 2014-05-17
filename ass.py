@@ -1,8 +1,7 @@
 import logging
 import sys
-import os.path
-import re
 import codecs
+import os
 
 
 class TimeOffset(object):
@@ -17,9 +16,13 @@ class TimeOffset(object):
         return TimeOffset(seconds=seconds)
 
     @staticmethod
-    def from_string(string):
+    def from_ass_string(string):
         hours, minutes, seconds = map(float, string.split(':'))
         return TimeOffset(hours*3600+minutes*60+seconds)
+
+    @staticmethod
+    def from_srt_string(string):
+        return TimeOffset.from_ass_string(string.replace(',','.'))
 
     def add_seconds(self, offset):
         self.seconds += offset
@@ -33,7 +36,14 @@ class TimeOffset(object):
             int(self.seconds // 3600),
             int((self.seconds // 60) % 60),
             int(self.seconds % 60),
-            int((self.seconds % 1) * 100))
+            int(round((self.seconds % 1) * 100)))
+
+    def to_srt_time_string(self):
+        return u'{0:02d}:{1:02d}:{2:02d},{3:03d}'.format(
+            int(self.seconds // 3600),
+            int((self.seconds // 60) % 60),
+            int(self.seconds % 60),
+            int(round((self.seconds % 1) * 1000)))
 
     def __unicode__(self):
         return self.to_ass_time_string()
@@ -45,27 +55,14 @@ class TimeOffset(object):
         return self.seconds == other.seconds
 
 
-class AssEvent(object):
-    def __init__(self, text):
-        super(AssEvent, self).__init__()
-        split = text.split(':', 1)
-        self.kind = split[0]
-        split = [x.strip() for x in split[1].split(',', 9)]
-
-        self.layer = split[0]
-        self.start = TimeOffset.from_string(split[1])
-        self.end = TimeOffset.from_string(split[2])
-        self.style = split[3]
-        self.name = split[4]
-        self.margin_left = split[5]
-        self.margin_right = split[6]
-        self.margin_vertical = split[7]
-        self.effect = split[8]
-        self.text = split[9]
-
+class ScriptEventBase(object):
+    def __init__(self, start, end):
+        super(ScriptEventBase, self).__init__()
         self.shift = 0
         self.broken = False
         self.diff = 1
+        self.start = start
+        self.end = end
 
     def mark_broken(self):
         self.broken = True
@@ -87,20 +84,86 @@ class AssEvent(object):
         self.shift = other.shift
         self.diff = other.diff
 
+
+class ScriptBase(object):
+    def sort_broken(self):
+        self.events = sorted(self.events, key=lambda x: x.broken)
+
+    def sort_by_time(self):
+        self.events = sorted(self.events, key=lambda x: x.start.total_seconds)
+
+
+class SrtEvent(ScriptEventBase):
+    def __init__(self, text):
+        lines = text.split('\n', 2)
+        times = lines[1].split('-->')
+        start = TimeOffset.from_srt_string(times[0].rstrip())
+        end = TimeOffset.from_srt_string(times[1].lstrip())
+
+        super(SrtEvent, self).__init__(start, end)
+        self.idx = int(lines[0])
+        self.text = lines[2]
+
     def __unicode__(self):
-        return u'{0}: {1},{2},{3},{4},{5},{6},{7},{8},{9},{10}'.format(self.kind, self.layer, self.start,
-                                                                      self.end, self.style, self.name,
-                                                                      self.margin_left, self.margin_right,
-                                                                      self.margin_vertical, self.effect,
-                                                                      self.text)
+        return u'{0}\n{1} --> {2}\n{3}'.format(self.idx, self.start.to_srt_time_string(),
+                                               self.end.to_srt_time_string(), self.text)
+
+
+class SrtScript(ScriptBase):
+    def __init__(self, path):
+        super(SrtScript, self).__init__()
+        try:
+            with codecs.open(path, encoding='utf-8-sig') as file:
+                self.events = [SrtEvent(x) for x in file.read().replace(os.linesep, '\n').split('\n\n') if x]
+        except IOError:
+            logging.critical("Script {0} not found".format(path))
+            sys.exit(2)
+
+    def save_to_file(self, path):
+        text = '\n\n'.join(unicode(x) for x in self.events)
+        with codecs.open(path, encoding='utf-8', mode= 'w') as file:
+            file.write(text)
+
+
+class AssEvent(ScriptEventBase):
+    def __init__(self, text):
+        split = text.split(':', 1)
+        self.kind = split[0]
+        split = [x.strip() for x in split[1].split(',', 9)]
+
+        start = TimeOffset.from_ass_string(split[1])
+        end = TimeOffset.from_ass_string(split[2])
+
+        super(AssEvent, self).__init__(start, end)
+
+        self.layer = split[0]
+        self.style = split[3]
+        self.name = split[4]
+        self.margin_left = split[5]
+        self.margin_right = split[6]
+        self.margin_vertical = split[7]
+        self.effect = split[8]
+        self.text = split[9]
+
+    def __unicode__(self):
+        return u'{0}: {1},{2},{3},{4},{5},{6},{7},{8},{9},{10}'.format(self.kind, self.layer,
+                                                                       self.start.to_ass_time_string(),
+                                                                       self.end.to_ass_time_string(),
+                                                                       self.style, self.name,
+                                                                       self.margin_left, self.margin_right,
+                                                                       self.margin_vertical, self.effect,
+                                                                       self.text)
 
     def __repr__(self):
         return unicode(self)
 
 
-
-class AssScript(object):
+class AssScript(ScriptBase):
     def __init__(self, path):
+        parse_script_info_line = lambda x: self.script_info.append(x)
+        parse_styles_line = lambda x: self.styles.append(x)
+        parse_event_line = lambda x: self.events.append(AssEvent(x))
+
         super(AssScript, self).__init__()
         self.script_info = []
         self.styles = []
@@ -115,11 +178,11 @@ class AssScript(object):
                         continue
                     low = line.lower()
                     if low == u'[script info]':
-                        parse_function = self.parse_script_info_line
+                        parse_function = parse_script_info_line
                     elif low == u'[v4+ styles]':
-                        parse_function = self.parse_styles_line
+                        parse_function = parse_styles_line
                     elif low == u'[events]':
-                        parse_function = self.parse_event_line
+                        parse_function = parse_event_line
                     elif low.startswith(u'format:'):
                         continue # ignore it
                     elif not parse_function:
@@ -129,22 +192,6 @@ class AssScript(object):
         except IOError:
             logging.critical("Script {0} not found".format(path))
             sys.exit(2)
-
-
-    def parse_script_info_line(self, line):
-        self.script_info.append(line)
-
-    def parse_styles_line(self, line):
-        self.styles.append(line)
-
-    def parse_event_line(self, line):
-        self.events.append(AssEvent(line))
-
-    def sort_broken(self):
-        self.events = sorted(self.events, key=lambda x: x.broken)
-
-    def sort_by_time(self):
-        self.events = sorted(self.events, key=lambda x: x.start.total_seconds)
 
     def save_to_file(self, path):
         # if os.path.exists(path):
