@@ -4,6 +4,7 @@ import numpy as np
 from chunk import Chunk
 import struct
 from time import time
+import os.path
 
 WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_EXTENSIBLE = 0xFFFE
@@ -21,7 +22,9 @@ class DownmixedWavFile(object):
                 raise Exception('Not a WAVE file')
 
             fmt_chunk_read = False
-            self._data_chunk = None
+            data_chink_read = False
+            file_size = os.path.getsize(path)
+
             while True:
                 try:
                     chunk = Chunk(self._file, bigendian=False)
@@ -32,12 +35,15 @@ class DownmixedWavFile(object):
                     self._read_fmt_chunk(chunk)
                     fmt_chunk_read = True
                 elif chunk.getname() == 'data':
-                    self._data_chunk = chunk
-                    self.frames_count = self._data_chunk.chunksize // self.frame_size
+                    if file_size > 0xFFFFFFFF:
+                        # large broken wav
+                        self.frames_count = (file_size - self._file.tell()) // self.frame_size
+                    else:
+                        self.frames_count = chunk.chunksize // self.frame_size
+                    data_chink_read = True
                     break
                 chunk.skip()
-
-            if not fmt_chunk_read or not self._data_chunk:
+            if not fmt_chunk_read or not data_chink_read:
                 raise Exception('Invalid WAV file')
         except:
             if self._file:
@@ -55,7 +61,7 @@ class DownmixedWavFile(object):
     def readframes(self, count):
         if not count:
             return ''
-        data = self._data_chunk.read(count * self.frame_size)
+        data = self._file.read(count * self.frame_size)
         if self.sample_width == 2:
             unpacked = np.fromstring(data, dtype=np.int16)
         elif self.sample_width == 3:
@@ -72,8 +78,6 @@ class DownmixedWavFile(object):
             cc = self.channels_count
             arrays = [unpacked[i::cc] for i in range(cc)]
             return reduce(lambda a, b: a.astype('float32') + b.astype('float32'), arrays) / float(cc)
-
-
 
     def _read_fmt_chunk(self, chunk):
         wFormatTag, self.channels_count, self.framerate, dwAvgBytesPerSec, wBlockAlign = struct.unpack('<HHLLH', chunk.read(14))
