@@ -68,10 +68,11 @@ class DownmixedWavFile(object):
 
         if self.channels_count == 1:
             return np.array(unpacked, dtype=np.float64)
-        elif self.channels_count == 2:
-            even = unpacked[::2]
-            odd = unpacked[1::2]
-            return (even + odd) / 2.0
+        else:
+            cc = self.channels_count
+            arrays = [unpacked[i::cc] for i in range(cc)]
+            return reduce(lambda a, b: a.astype('float32') + b.astype('float32'), arrays) / float(cc)
+
 
 
     def _read_fmt_chunk(self, chunk):
