@@ -16,21 +16,29 @@ class DownmixedWavFile(object):
         try:
             riff = Chunk(self._file, bigendian=False)
             if riff.getname() != 'RIFF':
-                raise Exception('file does not start with RIFF id')
+                raise Exception('File does not start with RIFF id')
             if riff.read(4) != 'WAVE':
-                raise Exception('not a WAVE file')
+                raise Exception('Not a WAVE file')
 
-            fmt = Chunk(self._file, bigendian=False)
-            if fmt.getname() != 'fmt ':
-                raise Exception('Invalid WAV header')
-            self._read_fmt_chunk(fmt)
-            fmt.skip()
+            fmt_chunk_read = False
+            self._data_chunk = None
+            while True:
+                try:
+                    chunk = Chunk(self._file, bigendian=False)
+                except EOFError:
+                    break
 
-            self._data_chunk = Chunk(self._file, bigendian=False)
-            if self._data_chunk.getname() != 'data':
-                raise Exception('Invalid WAV header')
-            self.frames_count = self._data_chunk.chunksize // self.frame_size
-            self.data_start = self._file
+                if chunk.getname() == 'fmt ':
+                    self._read_fmt_chunk(chunk)
+                    fmt_chunk_read = True
+                elif chunk.getname() == 'data':
+                    self._data_chunk = chunk
+                    self.frames_count = self._data_chunk.chunksize // self.frame_size
+                    break
+                chunk.skip()
+
+            if not fmt_chunk_read or not self._data_chunk:
+                raise Exception('Invalid WAV file')
         except:
             if self._file:
                 self._file.close()
