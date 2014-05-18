@@ -12,7 +12,7 @@ The purpose of this script is to avoid all the hassle of manual syncing. It atte
 ### How it works
 You need to provide two audio files and a subtitle file (.ass or .srt) that matches one of those files. For every line in the subtitles, the script will extract corresponding audio from the source audio stream and will try to find the closest similar pattern in the destination audio stream. The shift found will be applied to the subtitles.
 
-During loading, both audio streams will be downsampled and converted to internal representation suitable for OpenCV. You can control downsampling with `--sample-rate` and `--sample-type` arguments, however it's not recommended to touch these values unless you get some problems with the defaults (12kHz, float32 samples).
+During loading, both audio streams will be downsampled and converted to internal representation suitable for OpenCV (12kHz, float32 samples). You can control downsampling with `--sample-rate` and `--sample-type` arguments, however it's not recommended to touch these values unless you get some problems with the defaults or you have many small lines (e.g frame-by-frame typesetting usually works better with 24kHz).
 
 Of course it won't search the whole stream for every line. Instead, a small window (2 seconds in every direction, 4 total) is searched first, centered at the `original time + shift of the last line` position. If the script cannot find a reasonably good match in this window, it increases the search area to a larger value (20 seconds total by default) and attempts to search again, but this time the closest found match will be considered correct. You can control the size of the larger search window using the `--window` argument.
 

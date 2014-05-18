@@ -8,8 +8,9 @@ import numpy as np
 import argparse
 import chapters
 import os.path
+from time import time
 
-allowed_error = 0.02
+allowed_error = 0.01
 
 
 def abs_diff(a, b):
@@ -69,16 +70,6 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
     small_window = 2
     last_shift = 0
     for idx, event in enumerate(events):
-        if fast_skip:
-            shift_set = False
-            for processed in reversed(events[:idx]):
-                if processed.start == event.start and processed.end == event.end:
-                    logging.debug('{0}: skipped because identical to already processed (typesetting?)'.format(event.start))
-                    event.copy_shift_from(processed)
-                    shift_set = True
-            if shift_set:
-                continue
-
         if event.end == event.start:
             logging.debug('{0}: skipped because zero duration'.format(event.start))
             if idx == 0:
@@ -86,6 +77,16 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
             else:
                 event.copy_shift_from(events[idx - 1])
             continue
+
+        if fast_skip:
+            shift_set = False
+            for processed in reversed(events[:idx]):
+                if processed.start == event.start and processed.end == event.end:
+                    # logging.debug('{0}: skipped because identical to already processed (typesetting?)'.format(event.start))
+                    event.copy_shift_from(processed)
+                    shift_set = True
+            if shift_set:
+                continue
 
         if event.start.total_seconds > src_stream.duration_seconds:
             logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
@@ -241,4 +242,6 @@ def create_arg_parser():
 
 if __name__ == '__main__':
     args = create_arg_parser().parse_args(sys.argv[1:])
+    start_time = time()
     run(args)
+    logging.debug('Done in {0}s'.format(time() - start_time))
