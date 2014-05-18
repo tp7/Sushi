@@ -34,7 +34,7 @@ For the time being, the script is provided as-is. I don't know what exact versio
 1. Windows, but it probably will run on most other operation systems
 2. [Python 2.7.6][1] (won't run on 3.x)
 4. [NumPy 1.8.1][2]
-5. [OpenCV 2.4.9][3] (only `imgproc` module is used)
+5. [OpenCV 2.4.9][3] (putting [this file][4] in the same folder as sushi should be enough)
 
 
 ### Limitations
@@ -46,5 +46,6 @@ In short, while this might be safe for immediate viewing, you probably shouldn't
 
 
   [1]: https://www.python.org/download/releases/2.7.6/
-  [2]: http://www.numpy.org/
+  [2]: http://www.scipy.org/scipylib/download.html
   [3]: http://opencv.org/
+  [4]: https://dl.dropboxusercontent.com/u/54253260/DoNotDelete/cv2.pyd
