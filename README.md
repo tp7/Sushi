@@ -1,5 +1,5 @@
-## ShiftAss ##
-Script for shifting subtitles based on audio streams.
+## Sushi ##
+Automatic subtitle shifter for SRT and ASS based on audio streams.
 
 ### Declaimer ###
 This script is in super early alpha stage so don't expect it to handle any complicated cases or malformed input, have nice error reporting or super advanced features. It is provided with hope to find some users. If none will be found, I will shut the project down.
@@ -25,7 +25,7 @@ Then, the script will try to split all lines into groups. It can either try to b
 ### Usage
 The minimal command line looks like this:
 ```
-python shiftass.py --src-audio hdtv.wav --dst-audio bluray.wav -o output.ass subtitles.ass
+python sushi.py --src-audio hdtv.wav --dst-audio bluray.wav -o output.ass subtitles.ass
 ```
 
 ### Requirements

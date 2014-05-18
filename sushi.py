@@ -1,5 +1,5 @@
 import logging
-from ass import AssScript, SrtScript
+from subs import AssScript, SrtScript
 from wav import WavStream
 import sys
 from collections import namedtuple
@@ -208,7 +208,7 @@ def run(args):
 
 
 def create_arg_parser():
-    parser = argparse.ArgumentParser(description='Automatic subtitle shifter')
+    parser = argparse.ArgumentParser(description='Sushi - Automatic Subtitle Shifter')
 
     parser.add_argument('--window', default=10, type=int, dest='window',
                         help='Search window size')
