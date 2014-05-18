@@ -25,7 +25,7 @@ class TimeOffset(object):
         return TimeOffset.from_ass_string(string.replace(',','.'))
 
     def add_seconds(self, offset):
-        self.seconds += offset
+        self.seconds = max(0, self.seconds + offset)
 
     @property
     def total_seconds(self):
