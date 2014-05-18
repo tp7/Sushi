@@ -1,10 +1,8 @@
 ## Sushi ##
 Automatic subtitle shifter for SRT and ASS based on audio streams.
 
-### Declaimer ###
-This script is in super early alpha stage so don't expect it to handle any complicated cases or malformed input, have nice error reporting or super advanced features. It is provided with hope to find some users. If none will be found, I will shut the project down.
-
-I'm not a Python programmer. The code is a mess.
+### Disclaimer ###
+This script is in super early alpha stage so don't expect it to handle any complicated cases or malformed input, have nice error reporting or super advanced features.
 
 ### Purpose
 Imagine you've got a subtitle file synced to one video file, but you want to use these subtitles with some other video you've got via totally legal ways. The common example is TV vs. BD releases, PAL vs. NTSC video and releases in different countries. In a lot of cases, subtitles won't match right away and you need to sync them.
