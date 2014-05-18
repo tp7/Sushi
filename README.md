@@ -9,7 +9,7 @@ I'm not a Python programmer. The code is a mess.
 ### Purpose
 Imagine you've got a subtitle file synced to one video file, but you want to use these subtitles with some other video you've got via totally legal ways. The common example is TV vs. BD releases, PAL vs. NTSC video and releases in different countries. In a lot of cases, subtitles won't match right away and you need to sync them.
 
-The purpose of this script is to avoid all the hassle of manual syncing. It attempts to synchronize subtitles by finding similarities in audio streams. The script is very fast (not counting a few seconds to load large WAV files) and can be used right when you want to watch something.
+The purpose of this script is to avoid all the hassle of manual syncing. It attempts to synchronize subtitles by finding similarities in audio streams. The script is very fast and can be used right when you want to watch something.
 
 ### How it works
 You need to provide two audio files and a subtitle file (.ass or .srt) that matches one of those files. For every line in the subtitles, the script will extract corresponding audio from the source audio stream and will try to find the closest similar pattern in the destination audio stream. The shift found will be applied to the subtitles.
