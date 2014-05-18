@@ -136,7 +136,7 @@ def fix_near_borders(events):
                 x.copy_shift_from(sane)
 
     fix_border(events)
-    fix_border(reversed(events))
+    fix_border(list(reversed(events)))
 
 
 def average_shifts(events):
