@@ -63,7 +63,14 @@ def groups_from_chapters(events, times):
                          'First line in the group: {0}'.format(unicode(g[0])))
             correct_groups.extend(detect_groups(g))
         correct_groups = sorted(correct_groups, key=lambda g: g[0].start.total_seconds)
-        #todo: merge new groups with similar timing
+
+        i = 0
+        while i < len(correct_groups)-1:
+            if abs_diff(correct_groups[i][-1].shift, correct_groups[i+1][0].shift) < allowed_error:
+                correct_groups[i].extend(correct_groups[i+1])
+                del correct_groups[i+1]
+            else:
+                i += 1
 
     return correct_groups
 
