@@ -90,6 +90,8 @@ class DownmixedWavFile(object):
 
 
 class WavStream(object):
+    READ_CHUNK_SIZE = 1 # one second, seems to be the fastest
+
     def __init__(self, path, sample_rate=12000, sample_type='float32'):
         if sample_type not in ('float32', 'uint8'):
             raise RuntimeError('Unknown sample type of WAV stream, must be uint8 or float32')
@@ -102,11 +104,10 @@ class WavStream(object):
         self.sample_rate = sample_rate
 
         seconds_read = 0
-        chunk = 1  # one second, seems to be the fastest
         arrays = []
         before_read = time()
         while seconds_read < total_seconds:
-            data = file.readframes(int(chunk*file.framerate))
+            data = file.readframes(int(self.READ_CHUNK_SIZE*file.framerate))
             new_length = int(round(len(data) * downsample_rate))
 
             data = np.array(data, ndmin=2, dtype=np.uint16) # signed are treated as unsigned, this is important
@@ -116,10 +117,10 @@ class WavStream(object):
                 # precise but eats memory
                 arrays.append(data.astype(np.float32) / 65536.0)
             else:
-                # less precise but more memory efficient
-                arrays.append((data / 256.0).astype(np.uint8))
+                # less precise but a lot more memory efficient
+                arrays.append(data.view(dtype='uint8')[:, 1::2])
 
-            seconds_read += chunk
+            seconds_read += self.READ_CHUNK_SIZE
 
         self.data = np.concatenate(arrays, axis=1)
         file.close()
