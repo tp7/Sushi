@@ -92,7 +92,7 @@ class DownmixedWavFile(object):
 class WavStream(object):
     READ_CHUNK_SIZE = 1 # one second, seems to be the fastest
 
-    def __init__(self, path, sample_rate=12000, sample_type='float32'):
+    def __init__(self, path, sample_rate=12000, sample_type='uint8'):
         if sample_type not in ('float32', 'uint8'):
             raise RuntimeError('Unknown sample type of WAV stream, must be uint8 or float32')
 

@@ -222,7 +222,7 @@ def create_arg_parser():
 
     parser.add_argument('--sample-rate', default=12000, type=int, dest='sample_rate',
                         help='Downsampled audio sample rate')
-    parser.add_argument('--sample-type', default='float32', choices=['float32', 'uint8'], dest='sample_type',
+    parser.add_argument('--sample-type', default='uint8', choices=['float32', 'uint8'], dest='sample_type',
                         help='Downsampled audio representation type')
 
     # files
