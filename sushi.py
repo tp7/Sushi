@@ -17,31 +17,6 @@ def abs_diff(a, b):
     return max(a, b) - min(a, b)
 
 
-def groups_from_chapters(events, times):
-    times = list(times) # copy
-    times.append(36000000000) # very large event at the end
-    logging.debug('Chapter start points: {0}'.format(times))
-    groups = [[]]
-    current_chapter = 0
-
-    for event in events:
-        if event.start.total_seconds > times[current_chapter+1]:
-            groups.append([])
-            current_chapter += 1
-
-        groups[-1].append(event)
-
-    if not groups[-1]:
-        del groups[-1]
-
-    for g in groups:
-        if abs_diff(g[0].shift, g[-1].shift) > allowed_error:
-            logging.warn(u'Shift is very different at the edges of a chapter group, most likely chapters are wrong. '
-                         'First line in the group: {0}'.format(unicode(g[0])))
-        logging.debug('Group (start={0}, end={1}, lines={2}), shift: {3}'.format(g[0].start, g[-1].end, len(g), g[0].shift))
-    return groups
-
-
 def detect_groups(events):
     Group = namedtuple('Group', ['start', 'end'])
 
@@ -59,11 +34,38 @@ def detect_groups(events):
         groups.append(Group(start_index, len(events) - 2))
 
     # todo: merge very short groups
-    for g in groups:
-        logging.debug('Group (start={0}, end={1}, lines={2}), shift: {3}'.format(
-            events[g.start].start, events[g.end].end, g.end+1-g.start, events[g.start].shift))
-
     return [events[g.start:g.end + 1] for g in groups]
+
+
+def groups_from_chapters(events, times):
+    times = list(times)  # copy
+    times.append(36000000000)  # very large event at the end
+    logging.debug('Chapter start points: {0}'.format(times))
+    groups = [[]]
+    current_chapter = 0
+
+    for event in events:
+        if event.start.total_seconds > times[current_chapter + 1]:
+            groups.append([])
+            current_chapter += 1
+
+        groups[-1].append(event)
+
+    if not groups[-1]:
+        del groups[-1]
+
+    broken_groups = [g for g in groups if abs_diff(g[0].shift, g[-1].shift) > allowed_error]
+    correct_groups = [g for g in groups if g not in broken_groups]
+
+    if broken_groups:
+        for g in broken_groups:
+            logging.warn(u'Shift is very different at the edges of a chapter group, most likely chapters are wrong. Switched to automatic grouping.\n'
+                         'First line in the group: {0}'.format(unicode(g[0])))
+            correct_groups.extend(detect_groups(g))
+        correct_groups = sorted(correct_groups, key=lambda g: g[0].start.total_seconds)
+        #todo: merge new groups with similar timing
+
+    return correct_groups
 
 
 def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
@@ -145,7 +147,7 @@ def average_shifts(events):
     weights = [1 - x.diff for x in events]
     avg, weights_sum = np.average(shifts, weights=weights, returned=True)
     new_diff = 1 - weights_sum / len(events)
-    logging.debug('Average weight set to {0}'.format(avg))
+    logging.debug('Average shift set to {0}'.format(avg))
     for e in events:
         e.set_shift(avg, new_diff)
 
@@ -200,6 +202,7 @@ def run(args):
             groups = detect_groups(events)
 
         for g in groups:
+            logging.debug('Group (start={0}, end={1}, lines={2}), shift: {3}'.format(g[0].start, g[-1].end, len(g), g[0].shift))
             average_shifts(g)
             apply_shifts(g)
     else:
