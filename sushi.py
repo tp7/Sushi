@@ -204,17 +204,19 @@ def select_stream(streams, chosen_idx, file_title):
 def run(args):
     format = "%(levelname)s: %(message)s"
     logging.basicConfig(level=logging.DEBUG, format=format)
+    ignore_chapters = args.chapters_file is not None and args.chapters_file.lower() == 'none'
 
     check_file_exists(args.source, 'Source')
     check_file_exists(args.destination, 'Destination')
 
-    if not args.ignore_chapters:
+    if not ignore_chapters:
         check_file_exists(args.chapters_file, 'Chapters')
 
     chapter_times = []
     demux_destination = not is_wav(args.destination)
     demux_source = not is_wav(args.source)
     delete_dst_audio = delete_src_audio = delete_src_script = False
+
 
     if demux_source:
         src_info = FFmpeg.get_info(args.source)
@@ -224,7 +226,7 @@ def run(args):
             src_scripts = FFmpeg.get_subtitles_streams(src_info)
             src_script_stream = select_stream(src_scripts, args.src_script_idx, 'Source')
             src_script_type = src_script_stream.type
-        if args.grouping and not args.ignore_chapters and not args.chapters_file:
+        if args.grouping and not ignore_chapters and not args.chapters_file:
             chapter_times = FFmpeg.get_chapters_times(src_info)
     else:
         if args.script_file is None:
@@ -280,7 +282,7 @@ def run(args):
     else:
         dst_audio_path = args.destination
 
-    if args.grouping and not args.ignore_chapters and args.chapters_file:
+    if args.grouping and not ignore_chapters and args.chapters_file:
         if get_extension(args.chapters_file) == '.xml':
             chapter_times = chapters.get_xml_start_times(args.chapters_file)
         else:
@@ -357,10 +359,8 @@ def create_arg_parser():
     # files
     parser.add_argument('--no-cleanup', action='store_false', dest='cleanup',
                         help="Don't delete demuxed streams")
-    parser.add_argument('--no-chapters', action='store_true', dest='ignore_chapters',
-                        help='Ignore any chapters found in the source file')
     parser.add_argument('--chapters', default=None, dest='chapters_file', metavar='file',
-                        help='XML or OGM chapters to use instead of any found in the source')
+                        help="XML or OGM chapters to use instead of any found in the source. 'none' to disable.")
     parser.add_argument('--script', default=None, dest='script_file', metavar='file',
                         help='Subtitle file path to use instead of any found in the source')
 

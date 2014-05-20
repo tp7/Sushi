@@ -36,15 +36,15 @@ You need three things for sushi to work:
 2. Destination audio stream
 3. Subtitles file
 
-By default sushi will try to extract all these things from the files you've provided. If there's more than one appropriate stream in the file (e.g. two audio stream in the provided mkv), sushi will print an error and ask you to add the appropriate `--src-audio x` argument, where `x` - index of the audio stream in the container. There are also `--dst-audio` and `--src-script` that works like this.
+By default sushi will try to extract all these things from the files you've provided. If there's more than one appropriate stream in the file (e.g. two audio stream in the provided mkv), sushi will print an error and ask you to add the appropriate `--src-audio x` argument, where `x` - index of the audio stream in the container. There are also `--dst-audio` and `--src-script` that work like this.
 ```
 python sushi.py --src hdtv.mkv --dst bluray.mkv --src-audio 2
 ```
-By default sushi will try to extract audio, subtitles and chapters from the source file and audio from the destination file. You can overwrite this behaviour using `--script` and `--chapters` parameters. Whatever file you specify there will be used instead of anything found in the mkv. There is no setting to specify audio file.
+By default sushi will try to extract audio, subtitles and chapters from the source file and audio from the destination file. You can overwrite this behaviour using `--script` and `--chapters` parameters. Whatever file you specify there will be used instead of anything found in the source. There is no setting to specify audio files.
 ```
 python sushi.py --src hdtv.mkv --dst bluray.mkv --script external.srt
 ```
-If for some reason you don't want to use chapters at all, you can use the `--no-chapters` switch to disable them. Automatic grouping will be used instead (unless disabled).
+If there is some chapters in the provided file but for some reason you don't want to use any chapters at all, you can use the `--no-chapters` switch to disable them. Automatic grouping will be used instead (unless disabled).
 
 After the job is done, sushi will delete all demuxed streams. To avoid this, you can use the `--no-cleanup` switch.
 
