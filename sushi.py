@@ -1,4 +1,5 @@
 import logging
+from demux import FFmpeg
 from subs import AssScript, SrtScript
 from wav import WavStream
 import sys
@@ -167,28 +168,128 @@ def apply_shifts(events):
 def get_extension(path):
     return (os.path.splitext(path)[1]).lower()
 
+
+def is_wav(path):
+    return get_extension(path) == '.wav'
+
+
+def check_file_exists(path, file_title):
+    if path and not os.path.exists(path):
+        logging.critical("{0} file doesn't exist".format(file_title))
+        sys.exit(2)
+
+def select_stream(streams, chosen_idx, file_title):
+    format_streams = lambda streams: '\n'.join(
+        '{0}{1}: {2}'.format(s.id, ' (%s)' % s.title if s.title else '', s.info) for s in streams)
+
+    if not streams:
+        logging.critical('No candidate streams found in the {0} file'.format(file_title))
+        sys.exit(2)
+    if chosen_idx is None:
+        if len(streams) > 1:
+            logging.critical('More than one candidate stream found in the {0} file.'.format(file_title))
+            logging.critical('You need to specify the exact one to demux. Here are all candidate streams:')
+            logging.critical(format_streams(streams))
+            sys.exit(2)
+        return streams[0]
+
+    if not any(x.id == chosen_idx for x in streams):
+        logging.critical("Stream with index {0} doesn't exist in the {1} file.".format(chosen_idx, file_title))
+        logging.critical('Here are all that do:')
+        logging.critical(format_streams(streams))
+
+    return next(x.id == chosen_idx for x in streams)
+
+
 def run(args):
     format = "%(levelname)s: %(message)s"
     logging.basicConfig(level=logging.DEBUG, format=format)
 
-    src_ext = get_extension(args.input_script)
-    dst_ext = get_extension(args.output_script)
-    if src_ext != dst_ext:
+    check_file_exists(args.source, 'Source')
+    check_file_exists(args.destination, 'Destination')
+
+    if not args.ignore_chapters:
+        check_file_exists(args.chapters_file, 'Chapters')
+
+    src_script_type = src_script_stream = dst_script_type = dst_audio_stream = src_audio_stream = None
+    chapter_times = []
+    ffmpeg_acodec = 'pcm_s16le' if args.sample_type == 'float32' else 'pcm_u8'
+
+    if not is_wav(args.source):
+        src_info = FFmpeg.get_info(args.source)
+        src_audio_streams = FFmpeg.get_audio_streams(src_info)
+        src_audio_stream = select_stream(src_audio_streams, args.src_audio_idx, 'Source')
+        if not args.script_file:
+            src_scripts = FFmpeg.get_subtitles_streams(src_info)
+            src_script_stream = select_stream(src_scripts, args.src_script_idx, 'Source')
+            src_script_type = src_script_stream.type
+        if args.grouping and not args.ignore_chapters and not args.chapters_file:
+            chapter_times = FFmpeg.get_chapters_times(src_info)
+    else:
+        if args.script_file is None:
+            logging.critical("Script file isn't specified, aborting")
+            sys.exit(2)
+        check_file_exists(args.script_file, 'Script')
+        src_script_type = get_extension(args.script_file)
+
+    if not is_wav(args.destination):
+        dst_info = FFmpeg.get_info(args.destination)
+        dst_audio_streams = FFmpeg.get_audio_streams(dst_info)
+        dst_audio_stream = select_stream(dst_audio_streams, args.dst_audio_idx, 'Destination')
+
+    if args.output_script:
+        dst_script_type = get_extension(args.output_script)
+    else:
+        dst_script_type = src_script_type
+
+    if src_script_type is None or src_script_type != dst_script_type:
         logging.critical("Source and destination file types don't match")
         sys.exit(2)
-
-    if src_ext == '.ass':
-        script = AssScript(args.input_script)
-    elif src_ext == '.srt':
-        script = SrtScript(args.input_script)
-    else:
-        logging.critical('Invalid file type')
+    if src_script_type not in ('.ass', '.src'):
+        logging.critical('Unknown script type')
         sys.exit(2)
+
+    # after this point nothing should fail so it's safe to start demuxing
+    src_audio_path = dst_audio_path = src_script_path = None
+
+    if is_wav(args.source):
+        src_audio_path = args.source
+        src_script_path = args.script_file
+    else:
+        src_audio_path =  args.source + '.sushi.wav'
+        ffargs = {'audio_codec': ffmpeg_acodec, 'audio_stream': src_audio_stream.id, 'audio_path': src_audio_path}
+        if not args.script_file:
+            ffargs['script_stream'] = src_script_stream.id
+            src_script_path = args.source + '.sushi' + src_script_stream.type
+            ffargs['script_path'] = src_script_path
+        else:
+            src_script_path = args.script_file
+        FFmpeg.demux_file(args.source, **ffargs)
+
+    if is_wav(args.destination):
+        dst_audio_path = args.destination
+    else:
+        dst_audio_path = args.destination + '.sushi.wav'
+        FFmpeg.demux_file(args.destination,
+                          audio_path=dst_audio_path,
+                          audio_stream=dst_audio_stream.id,
+                          audio_codec=ffmpeg_acodec)
+
+    if args.grouping and not args.ignore_chapters and args.chapters_file:
+        if get_extension(args.chapters_file) == '.xml':
+            chapter_times = chapters.get_xml_start_times(args.chapters_file)
+        else:
+            chapter_times = chapters.get_ogm_start_times(args.chapters_file)
+
+    if src_script_type == '.ass':
+        script = AssScript(src_script_path)
+    else:
+        script = SrtScript(src_script_path)
 
     script.sort_by_time()
 
-    src_stream = WavStream(args.src_audio, sample_rate=args.sample_rate, sample_type=args.sample_type)
-    dst_stream = WavStream(args.dst_audio, sample_rate=args.sample_rate, sample_type=args.sample_type)
+    src_stream = WavStream(src_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
+    dst_stream = WavStream(dst_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
 
     calculate_shifts(src_stream, dst_stream, script.events, window=args.window, fast_skip=args.fast_skip)
 
@@ -199,22 +300,19 @@ def run(args):
     clip_obviously_wrong(events)
 
     if args.grouping:
-        if args.chapters_file:
-            if get_extension(args.chapters_file) == '.xml':
-                times = chapters.get_xml_start_times(args.chapters_file)
-            else:
-                times = chapters.get_ogm_start_times(args.chapters_file)
-            groups = groups_from_chapters(events, times)
+        if chapter_times:
+            groups = groups_from_chapters(events, chapter_times)
         else:
             groups = detect_groups(events)
 
         for g in groups:
             logging.debug('Group (start={0}, end={1}, lines={2}), shift: {3}'.format(g[0].start, g[-1].end, len(g), g[0].shift))
             average_shifts(g)
-            apply_shifts(g)
-    else:
-        apply_shifts(events)
 
+    apply_shifts(events)
+
+    if not args.output_script:
+        args.output_script = args.destination + '.sushi' + src_script_type
     script.save_to_file(args.output_script)
 
 
@@ -235,17 +333,27 @@ def create_arg_parser():
     parser.add_argument('--sample-type', default='uint8', choices=['float32', 'uint8'], dest='sample_type',
                         help='Downsampled audio representation type')
 
+
+    parser.add_argument('--src-audio', default=None, type=int, dest='src_audio_idx',
+                        help='Audio stream index of the source video')
+    parser.add_argument('--src-script', default=None, type=int, dest='src_script_idx',
+                        help='Script stream index of the source video')
+    parser.add_argument('--dst-audio', default=None, type=int, dest='dst_audio_idx',
+                        help='Audio stream index of the destination video')
     # files
+    parser.add_argument('--no-chapters', action='store_true', dest='ignore_chapters',
+                        help='Ignore any chapters found in the source file')
     parser.add_argument('--chapters', default=None, dest='chapters_file', metavar='file',
-                        help='Source XML or OGM chapters')
-    parser.add_argument('--src-audio', required=True, dest="src_audio", metavar='file',
-                        help='Source audio WAV')
-    parser.add_argument('--dst-audio', required=True, dest="dst_audio", metavar='file',
-                        help='Destination audio WAV')
-    parser.add_argument('-o', '--output', required=True, dest='output_script', metavar='file',
+                        help='XML or OGM chapters to use instead of any found in the source')
+    parser.add_argument('--script', default=None, dest='script_file', metavar='file',
+                        help='Subtitle file path to use instead of any found in the source')
+
+    parser.add_argument('--src', required=True, dest="source", metavar='file',
+                        help='Source audio/video')
+    parser.add_argument('--dst', required=True, dest="destination", metavar='file',
+                        help='Destination audio/video')
+    parser.add_argument('-o', '--output', default=None, dest='output_script', metavar='file',
                         help='Output script')
-    parser.add_argument('input_script',
-                        help='Input script')
 
     return parser
 
