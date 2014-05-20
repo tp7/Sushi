@@ -23,16 +23,39 @@ Then, the script will try to split all lines into groups. It can either try to b
 ### Usage
 The minimal command line looks like this:
 ```
-python sushi.py --src-audio hdtv.wav --dst-audio bluray.wav -o output.ass subtitles.ass
+python sushi.py --src hdtv.wav --dst bluray.wav --script subs.ass
 ```
+Output file name is optional - `"{destination_path}.sushi.{subtitles_format}"` is used by default.
+
+### Demuxing
+Sushi can use ffmpeg to automatically demux and decode streams from video files. Add ffmpeg to your PATH or put it into the same folder as sushi for it to work. 
+
+You need three things for sushi to work:
+
+1. Original audio stream
+2. Destination audio stream
+3. Subtitles file
+
+By default sushi will try to extract all these things from the files you've provided. If there's more than one appropriate stream in the file (e.g. two audio stream in the provided mkv), sushi will print an error and ask you to add the appropriate `--src-audio x` argument, where `x` - index of the audio stream in the container. There are also `--dst-audio` and `--src-script` that works like this.
+```
+python sushi.py --src hdtv.mkv --dst bluray.mkv --src-audio 2
+```
+By default sushi will try to extract audio, subtitles and chapters from the source file and audio from the destination file. You can overwrite this behaviour using `--script` and `--chapters` parameters. Whatever file you specify there will be used instead of anything found in the mkv. There is no setting to specify audio file.
+```
+python sushi.py --src hdtv.mkv --dst bluray.mkv --script external.srt
+```
+If for some reason you don't want to use chapters at all, you can use the `--no-chapters` switch to disable them. Automatic grouping will be used instead (unless disabled).
+
+After the job is done, sushi will delete all demuxed streams. To avoid this, you can use the `--no-cleanup` switch.
 
 ### Requirements
 For the time being, the script is provided as-is. I don't know what exact versions you need to run it, but here's my environment:
 
 1. Windows, but it probably will run on most other operation systems
 2. [Python 2.7.6][1] (won't run on 3.x)
-4. [NumPy 1.8.1][2]
-5. [OpenCV 2.4.9][3] (putting [this file][4] in the same folder as sushi should be enough)
+3. [NumPy 1.8.1][2]
+4. [OpenCV 2.4.9][3] (putting [this file][4] in the same folder as sushi should be enough)
+5. [FFmpeg][5] (only if demuxing is used)
 
 
 ### Limitations
@@ -47,3 +70,4 @@ In short, while this might be safe for immediate viewing, you probably shouldn't
   [2]: http://www.scipy.org/scipylib/download.html
   [3]: http://opencv.org/
   [4]: https://dl.dropboxusercontent.com/u/54253260/DoNotDelete/cv2.pyd
+  [5]: http://www.ffmpeg.org/download.html
