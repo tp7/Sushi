@@ -68,8 +68,3 @@ class FFmpeg(object):
                              info)
         return [SubtitlesStreamInfo(int(x[0]), x[1].strip(), sanitize_type(x[2]), x[3].strip()) for x in streams]
 
-
-#
-# info = FFmpeg.get_info(r"H:\!Ongoing\[Underwater] Knights of Sidonia - 06 (720p) [8F78C642].mkv")
-# subs = FFmpeg.get_subtitles_streams(info)
-# print(subs)
