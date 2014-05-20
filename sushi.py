@@ -213,7 +213,6 @@ def run(args):
 
     src_script_type = src_script_stream = dst_script_type = dst_audio_stream = src_audio_stream = None
     chapter_times = []
-    ffmpeg_acodec = 'pcm_s16le' if args.sample_type == 'float32' else 'pcm_u8'
 
     if not is_wav(args.source):
         src_info = FFmpeg.get_info(args.source)
@@ -257,7 +256,7 @@ def run(args):
         src_script_path = args.script_file
     else:
         src_audio_path =  args.source + '.sushi.wav'
-        ffargs = {'audio_codec': ffmpeg_acodec, 'audio_stream': src_audio_stream.id, 'audio_path': src_audio_path}
+        ffargs = {'audio_stream': src_audio_stream.id, 'audio_path': src_audio_path}
         if not args.script_file:
             ffargs['script_stream'] = src_script_stream.id
             src_script_path = args.source + '.sushi' + src_script_stream.type
@@ -272,8 +271,7 @@ def run(args):
         dst_audio_path = args.destination + '.sushi.wav'
         FFmpeg.demux_file(args.destination,
                           audio_path=dst_audio_path,
-                          audio_stream=dst_audio_stream.id,
-                          audio_codec=ffmpeg_acodec)
+                          audio_stream=dst_audio_stream.id)
 
     if args.grouping and not args.ignore_chapters and args.chapters_file:
         if get_extension(args.chapters_file) == '.xml':

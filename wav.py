@@ -66,14 +66,14 @@ class DownmixedWavFile(object):
             unpacked = np.fromstring(data, dtype=np.int16)
         elif self.sample_width == 3:
             bytes = np.ndarray(len(data), 'int8', data)
-            unpacked = np.zeros(len(data) / 3, 'int16')
+            unpacked = np.zeros(len(data) / 3, np.int16)
             unpacked.view(dtype='int8')[0::2] = bytes[1::3]
             unpacked.view(dtype='int8')[1::2] = bytes[2::3]
         else:
             raise Exception('Unsupported sample width: {0}'.format(self.sample_width))
 
         if self.channels_count == 1:
-            return np.array(unpacked, dtype=np.float64)
+            return unpacked
         else:
             cc = self.channels_count
             arrays = [unpacked[i::cc] for i in range(cc)]
@@ -110,21 +110,22 @@ class WavStream(object):
             data = file.readframes(int(self.READ_CHUNK_SIZE*file.framerate))
             new_length = int(round(len(data) * downsample_rate))
 
-            data = np.array(data, ndmin=2, dtype=np.uint16) # signed are treated as unsigned, this is important
+            data = np.array(data, ndmin=2) # signed are treated as unsigned, this is important
+
             data = cv2.resize(data, (new_length, 1), interpolation=cv2.INTER_NEAREST)
 
             if sample_type == 'float32':
                 # precise but eats memory
                 arrays.append(data.astype(np.float32) / 65536.0)
             else:
-                # less precise but a lot more memory efficient
-                arrays.append(data.view(dtype='uint8')[:, 1::2])
+                arrays.append(data.astype('uint16').view(dtype='uint8')[:, 1::2])
+
 
             seconds_read += self.READ_CHUNK_SIZE
 
         self.data = np.concatenate(arrays, axis=1)
         file.close()
-        logging.debug('Done reading WAV in {0}s'.format(time() - before_read))
+        logging.debug('Done reading WAV {0} in {1}s'.format(path, time() - before_read))
 
     @property
     def duration_seconds(self):

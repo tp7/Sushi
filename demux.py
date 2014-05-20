@@ -18,10 +18,6 @@ class FFmpeg(object):
 
     @staticmethod
     def demux_file(input_path, **kwargs):
-        acodec = kwargs.get('audio_codec', 'pcm_u8')
-        if acodec not in ('pcm_u8', 'pcm_s16le'):
-            raise Exception('Invalid audio_codec')
-
         args = ['ffmpeg', '-hide_banner', '-i', input_path, '-y']
 
         audio_stream = kwargs.get('audio_stream', None)
@@ -30,7 +26,7 @@ class FFmpeg(object):
             if audio_path is None:
                 raise Exception('Output audio path is not set')
             args.extend(('-map', '0:{0}'.format(audio_stream)))
-        args.extend(('-ac', '1', '-acodec', acodec, audio_path))
+        args.extend(('-ac', '1', '-acodec', 'pcm_s16le', audio_path))
 
         script_stream = kwargs.get('script_stream', None)
         script_path = kwargs.get('script_path', None)
