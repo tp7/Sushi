@@ -8,7 +8,7 @@ from itertools import takewhile
 import numpy as np
 import argparse
 import chapters
-import os.path
+import os
 from time import time
 
 allowed_error = 0.01
@@ -198,7 +198,7 @@ def select_stream(streams, chosen_idx, file_title):
         logging.critical('Here are all that do:')
         logging.critical(format_streams(streams))
 
-    return next(x.id == chosen_idx for x in streams)
+    return next(x for x in streams if x.id == chosen_idx)
 
 
 def run(args):
@@ -214,6 +214,7 @@ def run(args):
     chapter_times = []
     demux_destination = not is_wav(args.destination)
     demux_source = not is_wav(args.source)
+    delete_dst_audio = delete_src_audio = delete_src_script = False
 
     if demux_source:
         src_info = FFmpeg.get_info(args.source)
@@ -260,9 +261,11 @@ def run(args):
             ffargs['script_stream'] = src_script_stream.id
             src_script_path = args.source + '.sushi' + src_script_stream.type
             ffargs['script_path'] = src_script_path
+            delete_src_script = True
         else:
             src_script_path = args.script_file
         FFmpeg.demux_file(args.source, **ffargs)
+        delete_src_audio = True
     else:
         src_audio_path = args.source
         src_script_path = args.script_file
@@ -273,6 +276,7 @@ def run(args):
                           audio_path=dst_audio_path,
                           audio_stream=dst_audio_stream.id,
                           audio_rate=args.sample_rate)
+        delete_dst_audio = True
     else:
         dst_audio_path = args.destination
 
@@ -315,6 +319,14 @@ def run(args):
     if not args.output_script:
         args.output_script = args.destination + '.sushi' + src_script_type
     script.save_to_file(args.output_script)
+
+    #cleanup
+    if delete_dst_audio:
+        os.remove(dst_audio_path)
+    if delete_src_audio:
+        os.remove(src_audio_path)
+    if delete_src_script:
+        os.remove(src_script_path)
 
 
 def create_arg_parser():
