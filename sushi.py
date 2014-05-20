@@ -197,7 +197,7 @@ def select_stream(streams, chosen_idx, file_title):
         logging.critical("Stream with index {0} doesn't exist in the {1} file.".format(chosen_idx, file_title))
         logging.critical('Here are all that do:')
         logging.critical(format_streams(streams))
-
+        sys.exit(2)
     return next(x for x in streams if x.id == chosen_idx)
 
 
@@ -321,12 +321,13 @@ def run(args):
     script.save_to_file(args.output_script)
 
     #cleanup
-    if delete_dst_audio:
-        os.remove(dst_audio_path)
-    if delete_src_audio:
-        os.remove(src_audio_path)
-    if delete_src_script:
-        os.remove(src_script_path)
+    if args.cleanup:
+        if delete_dst_audio:
+            os.remove(dst_audio_path)
+        if delete_src_audio:
+            os.remove(src_audio_path)
+        if delete_src_script:
+            os.remove(src_script_path)
 
 
 def create_arg_parser():
@@ -354,6 +355,8 @@ def create_arg_parser():
     parser.add_argument('--dst-audio', default=None, type=int, dest='dst_audio_idx',
                         help='Audio stream index of the destination video')
     # files
+    parser.add_argument('--no-cleanup', action='store_false', dest='cleanup',
+                        help="Don't delete demuxed streams")
     parser.add_argument('--no-chapters', action='store_true', dest='ignore_chapters',
                         help='Ignore any chapters found in the source file')
     parser.add_argument('--chapters', default=None, dest='chapters_file', metavar='file',
