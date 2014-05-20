@@ -44,7 +44,7 @@ By default sushi will try to extract audio, subtitles and chapters from the sour
 ```
 python sushi.py --src hdtv.mkv --dst bluray.mkv --script external.srt
 ```
-If there is some chapters in the provided file but for some reason you don't want to use any chapters at all, you can use the `--no-chapters` switch to disable them. Automatic grouping will be used instead (unless disabled).
+If there is some chapters in the provided file but for some reason you don't want to use any chapters at all, you can use write `--chapters none` to disable them. Automatic grouping will be used instead (unless disabled).
 
 After the job is done, sushi will delete all demuxed streams. To avoid this, you can use the `--no-cleanup` switch.
 
