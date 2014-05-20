@@ -22,10 +22,13 @@ class FFmpeg(object):
 
         audio_stream = kwargs.get('audio_stream', None)
         audio_path = kwargs.get('audio_path', None)
+        audio_rate = kwargs.get('audio_rate', None)
         if audio_stream is not None:
             if audio_path is None:
                 raise Exception('Output audio path is not set')
             args.extend(('-map', '0:{0}'.format(audio_stream)))
+        if audio_rate:
+            args.extend(('-ar', str(audio_rate)))
         args.extend(('-ac', '1', '-acodec', 'pcm_s16le', audio_path))
 
         script_stream = kwargs.get('script_stream', None)

@@ -110,9 +110,9 @@ class WavStream(object):
             data = file.readframes(int(self.READ_CHUNK_SIZE*file.framerate))
             new_length = int(round(len(data) * downsample_rate))
 
-            data = np.array(data, ndmin=2) # signed are treated as unsigned, this is important
-
-            data = cv2.resize(data, (new_length, 1), interpolation=cv2.INTER_NEAREST)
+            data = data.reshape((1, len(data)))
+            if downsample_rate != 1:
+                data = cv2.resize(data, (new_length, 1), interpolation=cv2.INTER_NEAREST)
 
             if sample_type == 'float32':
                 # precise but eats memory

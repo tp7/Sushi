@@ -211,10 +211,11 @@ def run(args):
     if not args.ignore_chapters:
         check_file_exists(args.chapters_file, 'Chapters')
 
-    src_script_type = src_script_stream = dst_script_type = dst_audio_stream = src_audio_stream = None
     chapter_times = []
+    demux_destination = not is_wav(args.destination)
+    demux_source = not is_wav(args.source)
 
-    if not is_wav(args.source):
+    if demux_source:
         src_info = FFmpeg.get_info(args.source)
         src_audio_streams = FFmpeg.get_audio_streams(src_info)
         src_audio_stream = select_stream(src_audio_streams, args.src_audio_idx, 'Source')
@@ -228,6 +229,8 @@ def run(args):
         if args.script_file is None:
             logging.critical("Script file isn't specified, aborting")
             sys.exit(2)
+
+    if args.script_file:
         check_file_exists(args.script_file, 'Script')
         src_script_type = get_extension(args.script_file)
 
@@ -242,21 +245,17 @@ def run(args):
         dst_script_type = src_script_type
 
     if src_script_type is None or src_script_type != dst_script_type:
-        logging.critical("Source and destination file types don't match")
+        logging.critical("Source and destination file types don't match ({0} vs {1})".format(src_script_type, dst_script_type))
         sys.exit(2)
     if src_script_type not in ('.ass', '.src'):
         logging.critical('Unknown script type')
         sys.exit(2)
 
     # after this point nothing should fail so it's safe to start demuxing
-    src_audio_path = dst_audio_path = src_script_path = None
 
-    if is_wav(args.source):
-        src_audio_path = args.source
-        src_script_path = args.script_file
-    else:
+    if demux_source:
         src_audio_path =  args.source + '.sushi.wav'
-        ffargs = {'audio_stream': src_audio_stream.id, 'audio_path': src_audio_path}
+        ffargs = {'audio_stream': src_audio_stream.id, 'audio_path': src_audio_path, 'audio_rate': args.sample_rate}
         if not args.script_file:
             ffargs['script_stream'] = src_script_stream.id
             src_script_path = args.source + '.sushi' + src_script_stream.type
@@ -264,14 +263,18 @@ def run(args):
         else:
             src_script_path = args.script_file
         FFmpeg.demux_file(args.source, **ffargs)
-
-    if is_wav(args.destination):
-        dst_audio_path = args.destination
     else:
+        src_audio_path = args.source
+        src_script_path = args.script_file
+
+    if demux_destination:
         dst_audio_path = args.destination + '.sushi.wav'
         FFmpeg.demux_file(args.destination,
                           audio_path=dst_audio_path,
-                          audio_stream=dst_audio_stream.id)
+                          audio_stream=dst_audio_stream.id,
+                          audio_rate=args.sample_rate)
+    else:
+        dst_audio_path = args.destination
 
     if args.grouping and not args.ignore_chapters and args.chapters_file:
         if get_extension(args.chapters_file) == '.xml':
