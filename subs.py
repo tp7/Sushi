@@ -84,6 +84,14 @@ class ScriptEventBase(object):
         self.shift = other.shift
         self.diff = other.diff
 
+    def set_keyframes(self, prev_kf, next_kf):
+        self.prev_kf = prev_kf
+        self.next_kf = next_kf
+
+    def get_keyframes_distances(self):
+        p = None if self.prev_kf is None else self.prev_kf - (self.start.total_seconds + self.shift)
+        n = None if self.next_kf is None else self.next_kf - (self.end.total_seconds + self.shift)
+        return (p,n)
 
 class ScriptBase(object):
     def sort_broken(self):

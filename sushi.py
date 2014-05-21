@@ -1,5 +1,6 @@
 import logging
 from demux import FFmpeg
+from keyframes import parse_keyframes
 from subs import AssScript, SrtScript
 from wav import WavStream
 import sys
@@ -10,8 +11,10 @@ import argparse
 import chapters
 import os
 from time import time
+import bisect
 
-allowed_error = 0.01
+ALLOWED_ERROR = 0.01
+MAX_KEYFRAME_DISTANCE_FRAMES = 3
 
 
 def abs_diff(a, b):
@@ -25,7 +28,7 @@ def detect_groups(events):
     last_shift = events[0].shift
     groups = []
     for idx, event in enumerate(events):
-        if abs_diff(event.shift, last_shift) > allowed_error:
+        if abs_diff(event.shift, last_shift) > ALLOWED_ERROR:
             groups.append(Group(start_index, idx - 1))
             last_shift = event.shift
             start_index = idx
@@ -55,7 +58,7 @@ def groups_from_chapters(events, times):
     if not groups[-1]:
         del groups[-1]
 
-    broken_groups = [g for g in groups if abs_diff(g[0].shift, g[-1].shift) > allowed_error]
+    broken_groups = [g for g in groups if abs_diff(g[0].shift, g[-1].shift) > ALLOWED_ERROR]
     correct_groups = [g for g in groups if g not in broken_groups]
 
     if broken_groups:
@@ -67,7 +70,7 @@ def groups_from_chapters(events, times):
 
         i = 0
         while i < len(correct_groups)-1:
-            if abs_diff(correct_groups[i][-1].shift, correct_groups[i+1][0].shift) < allowed_error:
+            if abs_diff(correct_groups[i][-1].shift, correct_groups[i+1][0].shift) < ALLOWED_ERROR:
                 correct_groups[i].extend(correct_groups[i+1])
                 del correct_groups[i+1]
             else:
@@ -109,12 +112,14 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
         start_point = original_time + last_shift
 
         # searching with smaller window
-        diff, new_time = dst_stream.find_substream(tv_audio,
+        diff = new_time = None
+        if small_window < window:
+            diff, new_time = dst_stream.find_substream(tv_audio,
                                                    start_time=start_point - small_window,
                                                    end_time=start_point + small_window)
 
         # checking if times are close enough to last shift - no point in re-searching with full window if it's in the same group
-        if abs_diff(new_time - original_time, last_shift) > allowed_error:
+        if not new_time or abs_diff(new_time - original_time, last_shift) > ALLOWED_ERROR:
             diff, new_time = dst_stream.find_substream(tv_audio,
                                                        start_time=start_point - window,
                                                        end_time=start_point + window)
@@ -150,6 +155,35 @@ def fix_near_borders(events):
     fix_border(list(reversed(events)))
 
 
+def find_keyframes_nearby(events, keyframes):
+    for event in events:
+        idx = bisect.bisect_left(keyframes, event.start.total_seconds)
+        before = None if not idx else keyframes[idx if idx < len(keyframes) else idx-1]
+
+        idx = bisect.bisect_right(keyframes, event.end.total_seconds)
+        after = None if idx == len(keyframes) else keyframes[idx]
+
+        event.set_keyframes(before, after)
+
+def snap_to_keyframes(events, fps):
+    max_kf_distance = MAX_KEYFRAME_DISTANCE_FRAMES / fps
+    distances = []
+    for event in events:
+        for d in event.get_keyframes_distances():
+            if d is not None and abs(d) < max_kf_distance:
+                distances.append(d)
+    if not distances:
+        logging.info('No lines close enouth to keyframes')
+        return
+    mean = np.mean(distances)
+    logging.debug('Mean distance to keyframes: {0}'.format(mean))
+    max_snap_distance = (1.0 / fps) / 2.0
+    if abs(mean) < max_snap_distance:
+        logging.info('Looks close enough to keyframes, snapping')
+        for event in events:
+            event.shift += mean
+
+
 def average_shifts(events):
     shifts = [x.shift for x in events]
     weights = [1 - x.diff for x in events]
@@ -178,26 +212,32 @@ def check_file_exists(path, file_title):
         logging.critical("{0} file doesn't exist".format(file_title))
         sys.exit(2)
 
+
+def die(message = None):
+    if message:
+        logging.critical(message)
+    sys.exit(2)
+
+
 def select_stream(streams, chosen_idx, file_title):
     format_streams = lambda streams: '\n'.join(
         '{0}{1}: {2}'.format(s.id, ' (%s)' % s.title if s.title else '', s.info) for s in streams)
 
     if not streams:
-        logging.critical('No candidate streams found in the {0} file'.format(file_title))
-        sys.exit(2)
+        die('No candidate streams found in the {0} file'.format(file_title))
     if chosen_idx is None:
         if len(streams) > 1:
             logging.critical('More than one candidate stream found in the {0} file.'.format(file_title))
             logging.critical('You need to specify the exact one to demux. Here are all candidate streams:')
             logging.critical(format_streams(streams))
-            sys.exit(2)
+            die()
         return streams[0]
 
     if not any(x.id == chosen_idx for x in streams):
         logging.critical("Stream with index {0} doesn't exist in the {1} file.".format(chosen_idx, file_title))
         logging.critical('Here are all that do:')
         logging.critical(format_streams(streams))
-        sys.exit(2)
+        die()
     return next(x for x in streams if x.id == chosen_idx)
 
 
@@ -230,8 +270,7 @@ def run(args):
             chapter_times = FFmpeg.get_chapters_times(src_info)
     else:
         if args.script_file is None:
-            logging.critical("Script file isn't specified, aborting")
-            sys.exit(2)
+            die("Script file isn't specified, aborting")
 
     if args.script_file:
         check_file_exists(args.script_file, 'Script')
@@ -248,11 +287,20 @@ def run(args):
         dst_script_type = src_script_type
 
     if src_script_type is None or src_script_type != dst_script_type:
-        logging.critical("Source and destination file types don't match ({0} vs {1})".format(src_script_type, dst_script_type))
-        sys.exit(2)
+        die("Source and destination file types don't match ({0} vs {1})".format(src_script_type, dst_script_type))
     if src_script_type not in ('.ass', '.src'):
-        logging.critical('Unknown script type')
-        sys.exit(2)
+        die('Unknown script type')
+
+    if args.keyframes_file and not args.dst_fps:
+        die('Fps must be provided if keyframes are used')
+
+    if args.keyframes_file:
+        kfs = parse_keyframes(args.keyframes_file)
+        if not kfs:
+            die('No keyframes found in the provided keyframes file')
+        kfs = [f / args.dst_fps for f in kfs]
+    else:
+        kfs = None
 
     # after this point nothing should fail so it's safe to start demuxing
 
@@ -315,6 +363,12 @@ def run(args):
         for g in groups:
             logging.debug('Group (start={0}, end={1}, lines={2}), shift: {3}'.format(g[0].start, g[-1].end, len(g), g[0].shift))
             average_shifts(g)
+            if kfs:
+                find_keyframes_nearby(g, kfs)
+                snap_to_keyframes(g, args.dst_fps)
+    elif kfs:
+        find_keyframes_nearby(events, kfs)
+        snap_to_keyframes(events, args.dst_fps)
 
     apply_shifts(events)
 
@@ -363,6 +417,10 @@ def create_arg_parser():
                         help="XML or OGM chapters to use instead of any found in the source. 'none' to disable.")
     parser.add_argument('--script', default=None, dest='script_file', metavar='file',
                         help='Subtitle file path to use instead of any found in the source')
+    parser.add_argument('--keyframes', default=None, dest='keyframes_file', metavar='file',
+                        help='Keyframes file path to use.')
+    parser.add_argument('--fps', default=None, type=float, dest='dst_fps', metavar='file',
+                        help='Fps of destination video. Must be provided if keyframes are used.')
 
     parser.add_argument('--src', required=True, dest="source", metavar='file',
                         help='Source audio/video')
