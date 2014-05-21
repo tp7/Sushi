@@ -68,3 +68,9 @@ class FFmpeg(object):
                              info)
         return [SubtitlesStreamInfo(int(x[0]), x[1].strip(), sanitize_type(x[2]), x[3].strip()) for x in streams]
 
+    @staticmethod
+    def get_fps(info):
+        fps = re.findall(r'Stream #0:.*?Video: .*?,\s*([\d\.]+)\s*fps', info)
+        if not fps:
+            return None
+        return float(fps[0])

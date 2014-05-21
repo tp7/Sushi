@@ -173,7 +173,7 @@ def snap_to_keyframes(events, fps):
             if d is not None and abs(d) < max_kf_distance:
                 distances.append(d)
     if not distances:
-        logging.info('No lines close enouth to keyframes')
+        logging.info('No lines close enough to keyframes')
         return
     mean = np.mean(distances)
     logging.debug('Mean distance to keyframes: {0}'.format(mean))
@@ -256,7 +256,7 @@ def run(args):
     demux_destination = not is_wav(args.destination)
     demux_source = not is_wav(args.source)
     delete_dst_audio = delete_src_audio = delete_src_script = False
-
+    dst_video_fps = 'no_video'
 
     if demux_source:
         src_info = FFmpeg.get_info(args.source)
@@ -280,6 +280,7 @@ def run(args):
         dst_info = FFmpeg.get_info(args.destination)
         dst_audio_streams = FFmpeg.get_audio_streams(dst_info)
         dst_audio_stream = select_stream(dst_audio_streams, args.dst_audio_idx, 'Destination')
+        # dst_video_fps = FFmpeg.get_fps(dst_info)
 
     if args.output_script:
         dst_script_type = get_extension(args.output_script)
@@ -291,21 +292,31 @@ def run(args):
     if src_script_type not in ('.ass', '.src'):
         die('Unknown script type')
 
-    if args.keyframes_file and not args.dst_fps:
-        die('Fps must be provided if keyframes are used')
-
     if args.keyframes_file:
+        if not args.dst_fps:
+            if dst_video_fps == 'no_video':
+                die('Fps must be provided if keyframes are used')
+            elif not dst_video_fps:
+                die("Couldn't determine fps from the destination video stream but it's required when keyframe snapping enabled")
+            else:
+                dst_fps = dst_video_fps
+        else:
+            dst_fps = args.dst_fps
+
+        logging.debug('Using fps value of {0}'.format(dst_fps))
+
         kfs = parse_keyframes(args.keyframes_file)
         if not kfs:
             die('No keyframes found in the provided keyframes file')
-        kfs = [f / args.dst_fps for f in kfs]
+        kfs = [float(f) / dst_fps for f in kfs]
+        print(kfs[:10])
     else:
         kfs = None
 
     # after this point nothing should fail so it's safe to start demuxing
 
     if demux_source:
-        src_audio_path =  args.source + '.sushi.wav'
+        src_audio_path = args.source + '.sushi.wav'
         ffargs = {'audio_stream': src_audio_stream.id, 'audio_path': src_audio_path, 'audio_rate': args.sample_rate}
         if not args.script_file:
             ffargs['script_stream'] = src_script_stream.id
@@ -365,10 +376,10 @@ def run(args):
             average_shifts(g)
             if kfs:
                 find_keyframes_nearby(g, kfs)
-                snap_to_keyframes(g, args.dst_fps)
+                snap_to_keyframes(g, dst_fps)
     elif kfs:
         find_keyframes_nearby(events, kfs)
-        snap_to_keyframes(events, args.dst_fps)
+        snap_to_keyframes(events, dst_fps)
 
     apply_shifts(events)
 
