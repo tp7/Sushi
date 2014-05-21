@@ -93,6 +93,9 @@ class ScriptEventBase(object):
         n = None if self.next_kf is None else self.next_kf - (self.end.total_seconds + self.shift)
         return (p,n)
 
+    def adjust_shift(self, value):
+        self.shift += value
+
 class ScriptBase(object):
     def sort_broken(self):
         self.events = sorted(self.events, key=lambda x: x.broken)

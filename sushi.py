@@ -181,7 +181,7 @@ def snap_to_keyframes(events, fps):
     if abs(mean) < max_snap_distance:
         logging.info('Looks close enough to keyframes, snapping')
         for event in events:
-            event.shift += mean
+            event.adjust_shift(mean)
 
 
 def average_shifts(events):
