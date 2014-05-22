@@ -156,13 +156,19 @@ def fix_near_borders(events):
 
 
 def find_keyframes_nearby(events, keyframes):
+    def find_closest_kf(timestamp):
+        idx = bisect.bisect_left(keyframes, timestamp)
+        if idx == 0:
+            return keyframes[0]
+        if idx == len(keyframes):
+            return keyframes[-1]
+        before = keyframes[idx - 1]
+        after = keyframes[idx]
+        return after if after - timestamp < timestamp - before else before
+
     for event in events:
-        idx = bisect.bisect_left(keyframes, event.start.total_seconds)
-        before = None if not idx else keyframes[idx if idx < len(keyframes) else idx-1]
-
-        idx = bisect.bisect_right(keyframes, event.end.total_seconds)
-        after = None if idx == len(keyframes) else keyframes[idx]
-
+        before = find_closest_kf(event.start.total_seconds + event.shift)
+        after = find_closest_kf(event.end.total_seconds + event.shift)
         event.set_keyframes(before, after)
 
 def snap_to_keyframes(events, fps):
