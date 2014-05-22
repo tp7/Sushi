@@ -183,7 +183,7 @@ def snap_to_keyframes(events, fps):
         return
     mean = np.mean(distances)
     logging.debug('Mean distance to keyframes: {0}'.format(mean))
-    max_snap_distance = (1.0 / fps) / 2.0
+    max_snap_distance = (3.0 / fps) / 4.0
     if abs(mean) < max_snap_distance:
         logging.info('Looks close enough to keyframes, snapping')
         for event in events:
