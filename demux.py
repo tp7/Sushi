@@ -2,6 +2,7 @@ from subprocess import Popen, PIPE
 import re
 from collections import namedtuple
 import logging
+import sys
 
 AudioStreamInfo = namedtuple('AudioStreamInfo', ['id', 'info', 'title'])
 SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', 'title'])
@@ -10,11 +11,16 @@ SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', '
 class FFmpeg(object):
     @staticmethod
     def get_info(path):
-        process = Popen(['ffmpeg', '-hide_banner', '-i', path], stderr=PIPE)
-        out, err = process.communicate()
-        process.wait()
-        return err
-
+        try:
+            process = Popen(['ffmpeg', '-hide_banner', '-i', path], stderr=PIPE)
+            out, err = process.communicate()
+            process.wait()
+            return err
+        except WindowsError as e:
+            if e.winerror == 2:
+                logging.critical("Couldn't invoke ffmpeg, check that it's installed")
+                sys.exit(2)
+            raise
 
     @staticmethod
     def demux_file(input_path, **kwargs):
@@ -39,8 +45,14 @@ class FFmpeg(object):
             args.extend(('-map', '0:{0}'.format(script_stream)))
             args.append(script_path)
         logging.debug('ffmpeg args: {0}'.format(args))
-        process = Popen(args)
-        process.wait()
+        try:
+            process = Popen(args)
+            process.wait()
+        except WindowsError as e:
+            if e.winerror == 2:
+                logging.critical("Couldn't invoke ffmpeg, check that it's installed")
+                sys.exit(2)
+            raise
 
 
     @staticmethod
