@@ -1,5 +1,5 @@
 import logging
-from demux import FFmpeg
+from demux import FFmpeg, get_media_info
 from keyframes import parse_keyframes
 from subs import AssScript, SrtScript
 from wav import WavStream
@@ -265,15 +265,13 @@ def run(args):
     dst_video_fps = 'no_video'
 
     if demux_source:
-        src_info = FFmpeg.get_info(args.source)
-        src_audio_streams = FFmpeg.get_audio_streams(src_info)
-        src_audio_stream = select_stream(src_audio_streams, args.src_audio_idx, 'Source')
+        mi = get_media_info(args.source)
+        src_audio_stream = select_stream(mi.audio, args.src_audio_idx, 'Source')
         if not args.script_file:
-            src_scripts = FFmpeg.get_subtitles_streams(src_info)
-            src_script_stream = select_stream(src_scripts, args.src_script_idx, 'Source')
+            src_script_stream = select_stream(mi.subtitles, args.src_script_idx, 'Source')
             src_script_type = src_script_stream.type
         if args.grouping and not ignore_chapters and not args.chapters_file:
-            chapter_times = FFmpeg.get_chapters_times(src_info)
+            chapter_times = mi.chapters
     else:
         if args.script_file is None:
             die("Script file isn't specified, aborting")
@@ -283,10 +281,8 @@ def run(args):
         src_script_type = get_extension(args.script_file)
 
     if not is_wav(args.destination):
-        dst_info = FFmpeg.get_info(args.destination)
-        dst_audio_streams = FFmpeg.get_audio_streams(dst_info)
-        dst_audio_stream = select_stream(dst_audio_streams, args.dst_audio_idx, 'Destination')
-        # dst_video_fps = FFmpeg.get_fps(dst_info)
+        mi = get_media_info(args.destination)
+        dst_audio_stream = select_stream(mi.audio, args.dst_audio_idx, 'Destination')
 
     if args.output_script:
         dst_script_type = get_extension(args.output_script)

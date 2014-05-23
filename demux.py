@@ -6,6 +6,7 @@ import sys
 
 AudioStreamInfo = namedtuple('AudioStreamInfo', ['id', 'info', 'title'])
 SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', 'title'])
+MediaInfo = namedtuple('MediaInfo', ['audio', 'subtitles', 'chapters'])
 
 
 class FFmpeg(object):
@@ -86,3 +87,12 @@ class FFmpeg(object):
         if not fps:
             return None
         return float(fps[0])
+
+
+def get_media_info(path, audio=True, subtitles=True, chapters=True):
+    info = FFmpeg.get_info(path)
+    audio_streams = FFmpeg.get_audio_streams(info) if audio else None
+    subs_streams = FFmpeg.get_subtitles_streams(info) if audio else None
+    chapter_times = FFmpeg.get_chapters_times(info) if audio else None
+    return MediaInfo(audio_streams, subs_streams, chapter_times)
+
