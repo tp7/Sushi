@@ -89,6 +89,60 @@ class FFmpeg(object):
         return float(fps[0])
 
 
+class Timecodes(object):
+    def __init__(self, times, default_fps):
+        super(Timecodes, self).__init__()
+        self.times = times
+        self.default_frame_duration = 1000.0 / default_fps if default_fps else None
+
+
+    def get_frame_time(self, number):
+        try:
+            t = self.times[number]
+        except IndexError:
+            if not self.default_frame_duration:
+                raise Exception("Couldn't determine fps, broken state")
+            if self.times:
+                t = self.times[-1] + (self.default_frame_duration) * (number-len(self.times)-1)
+            else:
+                t = number * self.default_frame_duration
+
+        return round(t)
+
+
+def timecodes_v1_to_v2(default_fps, overrides):
+    # start, end, fps
+    overrides = [(int(x[0]), int(x[1]), float(x[2])) for x in overrides]
+    if not overrides:
+        return []
+
+    fps = [default_fps] * (overrides[-1][1]+1)
+    for o in overrides:
+        fps[o[0]:o[1]+1] = [o[2]] * (o[1]-o[0]+1)
+
+    v2 = [0]
+    for d in (1000.0 / f for f in fps):
+        v2.append(v2[-1] + d)
+    return v2
+
+
+def parse_timecodes(text):
+    lines = text.splitlines()
+    if not lines:
+        return []
+    first = lines[0].lower().lstrip()
+    if first.startswith('# timecode format v2'):
+        tcs = [float(x) for x in lines[1:]]
+        return Timecodes(tcs, None)
+    elif first.startswith('# timecode format v1'):
+        default = float(lines[1].lower().replace('assume ', ""))
+        overrides = (x.split(',') for x in lines[2:])
+        return Timecodes(timecodes_v1_to_v2(default, overrides), default)
+    else:
+        logging.critical('This timecodes format is not supported')
+        sys.exit(2)
+
+
 def get_media_info(path, audio=True, subtitles=True, chapters=True):
     info = FFmpeg.get_info(path)
     audio_streams = FFmpeg.get_audio_streams(info) if audio else None
