@@ -1,5 +1,5 @@
 import logging
-from demux import FFmpeg, get_media_info
+from demux import FFmpeg, get_media_info, read_timecodes, CfrTimecodes
 from keyframes import parse_keyframes
 from subs import AssScript, SrtScript
 from wav import WavStream
@@ -171,19 +171,23 @@ def find_keyframes_nearby(events, keyframes):
         after = find_closest_kf(event.end.total_seconds + event.shift)
         event.set_keyframes(before, after)
 
-def snap_to_keyframes(events, fps):
-    max_kf_distance = MAX_KEYFRAME_DISTANCE_FRAMES / fps
+def snap_to_keyframes(events, timecodes):
     distances = []
+    frame_sizes = []
     for event in events:
+        frame_sizes.append(timecodes.get_frame_size(event.start.total_seconds))
         for d in event.get_keyframes_distances():
-            if d is not None and abs(d) < max_kf_distance:
+            if d is not None and abs(d) < (MAX_KEYFRAME_DISTANCE_FRAMES * frame_sizes[-1]):
                 distances.append(d)
+
+    mean_fs = np.mean(frame_sizes)
     if not distances:
-        logging.info('No lines close enough to keyframes')
+        logging.info('No lines close enough to keyframes. Mean frame size: {0}'.format(mean_fs))
         return
     mean = np.mean(distances)
-    logging.debug('Mean distance to keyframes: {0}'.format(mean))
-    max_snap_distance = (3.0 / fps) / 4.0
+    logging.debug('Mean distance to keyframes: {0}. Mean frame size: {1}'.format(mean, mean_fs))
+
+    max_snap_distance = (3.0 / 4.0) * mean_fs
     if abs(mean) < max_snap_distance:
         logging.info('Looks close enough to keyframes, snapping')
         for event in events:
@@ -252,8 +256,11 @@ def run(args):
     logging.basicConfig(level=logging.DEBUG, format=format)
     ignore_chapters = args.chapters_file is not None and args.chapters_file.lower() == 'none'
 
+    # first part should do all possible validation and should NOT take significant amount of time
     check_file_exists(args.source, 'Source')
     check_file_exists(args.destination, 'Destination')
+    check_file_exists(args.timecodes_file, 'Timecodes')
+    check_file_exists(args.keyframes_file, 'Keyframes')
 
     if not ignore_chapters:
         check_file_exists(args.chapters_file, 'Chapters')
@@ -262,7 +269,9 @@ def run(args):
     demux_destination = not is_wav(args.destination)
     demux_source = not is_wav(args.source)
     delete_dst_audio = delete_src_audio = delete_src_script = False
-    dst_video_fps = 'no_video'
+
+    if args.timecodes_file and args.dst_fps:
+        die('Both fps and timecodes file cannot be specified at the same time')
 
     if demux_source:
         mi = get_media_info(args.source)
@@ -284,38 +293,30 @@ def run(args):
         mi = get_media_info(args.destination)
         dst_audio_stream = select_stream(mi.audio, args.dst_audio_idx, 'Destination')
 
-    if args.output_script:
-        dst_script_type = get_extension(args.output_script)
-    else:
-        dst_script_type = src_script_type
+    dst_script_type = get_extension(args.output_script) if args.output_script else src_script_type
 
-    if src_script_type is None or src_script_type != dst_script_type:
+    if src_script_type != dst_script_type:
         die("Source and destination file types don't match ({0} vs {1})".format(src_script_type, dst_script_type))
     if src_script_type not in ('.ass', '.src'):
         die('Unknown script type')
 
     if args.keyframes_file:
-        if not args.dst_fps:
-            if dst_video_fps == 'no_video':
-                die('Fps must be provided if keyframes are used')
-            elif not dst_video_fps:
-                die("Couldn't determine fps from the destination video stream but it's required when keyframe snapping enabled")
-            else:
-                dst_fps = dst_video_fps
+        if not args.dst_fps and not args.timecodes_file:
+            die('Fps or timecodes file must be provided if keyframes are used')
+        if args.timecodes_file:
+            timecodes = read_timecodes(args.timecodes_file)
         else:
-            dst_fps = args.dst_fps
-
-        logging.debug('Using fps value of {0}'.format(dst_fps))
+            timecodes = CfrTimecodes(args.dst_fps)
 
         kfs = parse_keyframes(args.keyframes_file)
         if not kfs:
             die('No keyframes found in the provided keyframes file')
-        kfs = [float(f) / dst_fps for f in kfs]
+        kfs = [timecodes.get_frame_time(f) for f in kfs]
         print(kfs[:10])
     else:
         kfs = None
 
-    # after this point nothing should fail so it's safe to start demuxing
+    # after this point nothing should fail so it's safe to start demuxing and other slow operations
 
     if demux_source:
         src_audio_path = args.source + '.sushi.wav'
@@ -378,10 +379,10 @@ def run(args):
             average_shifts(g)
             if kfs:
                 find_keyframes_nearby(g, kfs)
-                snap_to_keyframes(g, dst_fps)
+                snap_to_keyframes(g, timecodes)
     elif kfs:
         find_keyframes_nearby(events, kfs)
-        snap_to_keyframes(events, dst_fps)
+        snap_to_keyframes(events, timecodes)
 
     apply_shifts(events)
 
@@ -434,6 +435,8 @@ def create_arg_parser():
                         help='Keyframes file path to use.')
     parser.add_argument('--fps', default=None, type=float, dest='dst_fps', metavar='file',
                         help='Fps of destination video. Must be provided if keyframes are used.')
+    parser.add_argument('--timecodes', default=None, dest='timecodes_file', metavar='file',
+                        help='Timecodes file to use instead of making one from the source (when possible)')
 
     parser.add_argument('--src', required=True, dest="source", metavar='file',
                         help='Source audio/video')

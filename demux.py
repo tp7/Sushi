@@ -3,6 +3,7 @@ import re
 from collections import namedtuple
 import logging
 import sys
+import bisect
 
 AudioStreamInfo = namedtuple('AudioStreamInfo', ['id', 'info', 'title'])
 SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', 'title'])
@@ -93,21 +94,55 @@ class Timecodes(object):
     def __init__(self, times, default_fps):
         super(Timecodes, self).__init__()
         self.times = times
-        self.default_frame_duration = 1000.0 / default_fps if default_fps else None
+        self.default_frame_duration = 1.0 / default_fps if default_fps else None
 
 
     def get_frame_time(self, number):
         try:
-            t = self.times[number]
+            return self.times[number]
         except IndexError:
             if not self.default_frame_duration:
                 raise Exception("Couldn't determine fps, broken state")
             if self.times:
-                t = self.times[-1] + (self.default_frame_duration) * (number-len(self.times)-1)
+                return self.times[-1] + (self.default_frame_duration) * (number-len(self.times)+1)
             else:
-                t = number * self.default_frame_duration
+                return number * self.default_frame_duration
 
-        return round(t)
+    def get_frame_size(self, timestamp):
+        def average(a, b):
+            return (a+b)/2.0
+
+        try:
+            number = bisect.bisect_left(self.times, timestamp)
+        except:
+            return self.default_frame_duration
+
+        c = self.get_frame_time(number)
+
+        if number == 0:
+            n2 = self.get_frame_time(number+2)
+            n1 = self.get_frame_time(number+1)
+            return average(n2-n1, n1-c)
+        elif number == len(self.times):
+            p = self.get_frame_time(number-1)
+            p2 = self.get_frame_time(number-2)
+            return average(c-p, p-p2)
+        else:
+            n = self.get_frame_time(number+1)
+            p = self.get_frame_time(number-1)
+            return average(n-c, c-p)
+
+
+class CfrTimecodes(object):
+    def __init__(self, fps):
+        self.fps = fps
+        self.frame_duration = 1.0 / fps
+
+    def get_frame_time(self, number):
+        return number * self.frame_duration
+
+    def get_frame_size(self, timestamp):
+        return self.frame_duration
 
 
 def timecodes_v1_to_v2(default_fps, overrides):
@@ -121,18 +156,19 @@ def timecodes_v1_to_v2(default_fps, overrides):
         fps[o[0]:o[1]+1] = [o[2]] * (o[1]-o[0]+1)
 
     v2 = [0]
-    for d in (1000.0 / f for f in fps):
+    for d in (1.0 / f for f in fps):
         v2.append(v2[-1] + d)
     return v2
 
 
-def parse_timecodes(text):
-    lines = text.splitlines()
+def read_timecodes(path):
+    with open(path) as file:
+        lines = file.read().splitlines()
     if not lines:
         return []
     first = lines[0].lower().lstrip()
     if first.startswith('# timecode format v2'):
-        tcs = [float(x) for x in lines[1:]]
+        tcs = [float(x) / 1000.0 for x in lines[1:]]
         return Timecodes(tcs, None)
     elif first.startswith('# timecode format v1'):
         default = float(lines[1].lower().replace('assume ', ""))
@@ -150,3 +186,6 @@ def get_media_info(path, audio=True, subtitles=True, chapters=True):
     chapter_times = FFmpeg.get_chapters_times(info) if audio else None
     return MediaInfo(audio_streams, subs_streams, chapter_times)
 
+# t = read_timecodes('J:\\tc2.txt')
+# print(t.get_frame_size(1359.66))
+# print(t.get_frame_time(4010)  * 1000)
