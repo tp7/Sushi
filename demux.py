@@ -109,9 +109,6 @@ class Timecodes(object):
                 return number * self.default_frame_duration
 
     def get_frame_size(self, timestamp):
-        def average(a, b):
-            return (a+b)/2.0
-
         try:
             number = bisect.bisect_left(self.times, timestamp)
         except:
@@ -119,18 +116,12 @@ class Timecodes(object):
 
         c = self.get_frame_time(number)
 
-        if number == 0:
-            n2 = self.get_frame_time(number+2)
-            n1 = self.get_frame_time(number+1)
-            return average(n2-n1, n1-c)
-        elif number == len(self.times):
+        if number == len(self.times):
             p = self.get_frame_time(number-1)
-            p2 = self.get_frame_time(number-2)
-            return average(c-p, p-p2)
+            return c-p
         else:
             n = self.get_frame_time(number+1)
-            p = self.get_frame_time(number-1)
-            return average(n-c, c-p)
+            return n-c
 
 
 class CfrTimecodes(object):
