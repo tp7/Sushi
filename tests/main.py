@@ -33,6 +33,14 @@ class MainScriptTestCase(unittest.TestCase):
         keys = ['--src', media('nichibros.m4a'), '--dst', media('nichibros-shifted.m4a'), '--script', media('nKWDBN8rUw65QxcCxVnpcMwH5gFy65')]
         self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*exist'), lambda: parse_args_and_run(keys))
 
+    def test_raises_on_unknown_script_type(self):
+        keys = ['--src', media('nichibros.m4a'), '--dst', media('nichibros-shifted.m4a'), '--script', media('nichibros.m4a')]
+        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*type'), lambda: parse_args_and_run(keys))
+
+    def test_raises_on_script_type_not_matching(self):
+        keys = ['--src', media('nichibros.m4a'), '--dst', media('nichibros-shifted.m4a'), '--script', media('nichibros.ass'), '-o', 'nichibros.srt']
+        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*type.*match'), lambda: parse_args_and_run(keys))
+
     def test_raises_on_keyframes_not_existing(self):
         keys = self.get_nichibros()
         keys.extend(['--keyframes', 'this_totally_does_not_exist_nKWDBN8rUw65QxcCxVnpcMwH5gFy65'])
