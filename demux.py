@@ -4,6 +4,7 @@ from collections import namedtuple
 import logging
 import sys
 import bisect
+from common import SushiError
 
 AudioStreamInfo = namedtuple('AudioStreamInfo', ['id', 'info', 'title'])
 SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', 'title'])
@@ -20,8 +21,7 @@ class FFmpeg(object):
             return err
         except WindowsError as e:
             if e.winerror == 2:
-                logging.critical("Couldn't invoke ffmpeg, check that it's installed")
-                sys.exit(2)
+                raise SushiError("Couldn't invoke ffmpeg, check that it's installed")
             raise
 
     @staticmethod
@@ -165,8 +165,7 @@ def parse_timecodes(text):
         overrides = (x.split(',') for x in lines[2:])
         return Timecodes(timecodes_v1_to_v2(default, overrides), default)
     else:
-        logging.critical('This timecodes format is not supported')
-        sys.exit(2)
+        raise SushiError('This timecodes format is not supported')
 
 
 def read_timecodes(path):
@@ -180,7 +179,3 @@ def get_media_info(path, audio=True, subtitles=True, chapters=True):
     subs_streams = FFmpeg.get_subtitles_streams(info) if audio else None
     chapter_times = FFmpeg.get_chapters_times(info) if audio else None
     return MediaInfo(audio_streams, subs_streams, chapter_times)
-
-# t = read_timecodes('J:\\tc2.txt')
-# print(t.get_frame_size(1359.66))
-# print(t.get_frame_time(4010)  * 1000)

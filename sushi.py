@@ -1,4 +1,5 @@
 import logging
+from common import SushiError
 from demux import FFmpeg, get_media_info, read_timecodes, CfrTimecodes
 from keyframes import parse_keyframes
 from subs import AssScript, SrtScript
@@ -219,14 +220,7 @@ def is_wav(path):
 
 def check_file_exists(path, file_title):
     if path and not os.path.exists(path):
-        logging.critical("{0} file doesn't exist".format(file_title))
-        sys.exit(2)
-
-
-def die(message = None):
-    if message:
-        logging.critical(message)
-    sys.exit(2)
+        raise SushiError("{0} file doesn't exist".format(file_title))
 
 
 def select_stream(streams, chosen_idx, file_title):
@@ -234,20 +228,20 @@ def select_stream(streams, chosen_idx, file_title):
         '{0}{1}: {2}'.format(s.id, ' (%s)' % s.title if s.title else '', s.info) for s in streams)
 
     if not streams:
-        die('No candidate streams found in the {0} file'.format(file_title))
+        raise SushiError('No candidate streams found in the {0} file'.format(file_title))
     if chosen_idx is None:
         if len(streams) > 1:
             logging.critical('More than one candidate stream found in the {0} file.'.format(file_title))
             logging.critical('You need to specify the exact one to demux. Here are all candidate streams:')
             logging.critical(format_streams(streams))
-            die()
+            raise SushiError()
         return streams[0]
 
     if not any(x.id == chosen_idx for x in streams):
         logging.critical("Stream with index {0} doesn't exist in the {1} file.".format(chosen_idx, file_title))
         logging.critical('Here are all that do:')
         logging.critical(format_streams(streams))
-        die()
+        raise SushiError()
     return next(x for x in streams if x.id == chosen_idx)
 
 
@@ -271,7 +265,7 @@ def run(args):
     delete_dst_audio = delete_src_audio = delete_src_script = False
 
     if args.timecodes_file and args.dst_fps:
-        die('Both fps and timecodes file cannot be specified at the same time')
+        raise SushiError('Both fps and timecodes file cannot be specified at the same time')
 
     if demux_source:
         mi = get_media_info(args.source)
@@ -283,7 +277,7 @@ def run(args):
             chapter_times = mi.chapters
     else:
         if args.script_file is None:
-            die("Script file isn't specified, aborting")
+            raise SushiError("Script file isn't specified, aborting")
 
     if args.script_file:
         check_file_exists(args.script_file, 'Script')
@@ -296,13 +290,13 @@ def run(args):
     dst_script_type = get_extension(args.output_script) if args.output_script else src_script_type
 
     if src_script_type != dst_script_type:
-        die("Source and destination file types don't match ({0} vs {1})".format(src_script_type, dst_script_type))
+        raise SushiError("Source and destination file types don't match ({0} vs {1})".format(src_script_type, dst_script_type))
     if src_script_type not in ('.ass', '.src'):
-        die('Unknown script type')
+        raise SushiError('Unknown script type')
 
     if args.keyframes_file:
         if not args.dst_fps and not args.timecodes_file:
-            die('Fps or timecodes file must be provided if keyframes are used')
+            raise SushiError('Fps or timecodes file must be provided if keyframes are used')
         if args.timecodes_file:
             timecodes = read_timecodes(args.timecodes_file)
         else:
@@ -310,7 +304,7 @@ def run(args):
 
         kfs = parse_keyframes(args.keyframes_file)
         if not kfs:
-            die('No keyframes found in the provided keyframes file')
+            raise SushiError('No keyframes found in the provided keyframes file')
         kfs = [timecodes.get_frame_time(f) for f in kfs]
         print(kfs[:10])
     else:
@@ -448,8 +442,15 @@ def create_arg_parser():
     return parser
 
 
-if __name__ == '__main__':
-    args = create_arg_parser().parse_args(sys.argv[1:])
+def parse_args_and_run(cmd_keys):
+    args = create_arg_parser().parse_args(cmd_keys)
     start_time = time()
     run(args)
     logging.debug('Done in {0}s'.format(time() - start_time))
+
+
+if __name__ == '__main__':
+    try:
+        parse_args_and_run(sys.argv[1:])
+    except SushiError as e:
+        logging.critical(e.message)

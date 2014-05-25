@@ -1,0 +1,2 @@
+class SushiError(Exception):
+    pass
