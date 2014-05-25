@@ -161,9 +161,8 @@ def timecodes_v1_to_v2(default_fps, overrides):
     return v2
 
 
-def read_timecodes(path):
-    with open(path) as file:
-        lines = file.read().splitlines()
+def parse_timecodes(text):
+    lines = text.splitlines()
     if not lines:
         return []
     first = lines[0].lower().lstrip()
@@ -177,6 +176,11 @@ def read_timecodes(path):
     else:
         logging.critical('This timecodes format is not supported')
         sys.exit(2)
+
+
+def read_timecodes(path):
+    with open(path) as file:
+        return parse_timecodes(file.read())
 
 
 def get_media_info(path, audio=True, subtitles=True, chapters=True):
