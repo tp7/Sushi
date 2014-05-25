@@ -255,17 +255,17 @@ def run(args):
     check_file_exists(args.destination, 'Destination')
     check_file_exists(args.timecodes_file, 'Timecodes')
     check_file_exists(args.keyframes_file, 'Keyframes')
+    check_file_exists(args.script_file, 'Script')
 
     if not ignore_chapters:
         check_file_exists(args.chapters_file, 'Chapters')
 
-    chapter_times = []
-    demux_destination = not is_wav(args.destination)
-    demux_source = not is_wav(args.source)
-    delete_dst_audio = delete_src_audio = delete_src_script = False
-
     if args.timecodes_file and args.dst_fps:
         raise SushiError('Both fps and timecodes file cannot be specified at the same time')
+
+    chapter_times = []
+    demux_source = not is_wav(args.source)
+    delete_dst_audio = delete_src_audio = delete_src_script = False
 
     if demux_source:
         mi = get_media_info(args.source)
@@ -276,11 +276,10 @@ def run(args):
         if args.grouping and not ignore_chapters and not args.chapters_file:
             chapter_times = mi.chapters
     else:
-        if args.script_file is None:
+        if not args.script_file:
             raise SushiError("Script file isn't specified, aborting")
 
     if args.script_file:
-        check_file_exists(args.script_file, 'Script')
         src_script_type = get_extension(args.script_file)
 
     if not is_wav(args.destination):
@@ -295,18 +294,17 @@ def run(args):
         raise SushiError('Unknown script type')
 
     if args.keyframes_file:
-        if not args.dst_fps and not args.timecodes_file:
-            raise SushiError('Fps or timecodes file must be provided if keyframes are used')
         if args.timecodes_file:
             timecodes = read_timecodes(args.timecodes_file)
-        else:
+        elif args.dst_fps:
             timecodes = CfrTimecodes(args.dst_fps)
+        else:
+            raise SushiError('Fps or timecodes file must be provided if keyframes are used')
 
         kfs = parse_keyframes(args.keyframes_file)
         if not kfs:
             raise SushiError('No keyframes found in the provided keyframes file')
         kfs = [timecodes.get_frame_time(f) for f in kfs]
-        print(kfs[:10])
     else:
         kfs = None
 
@@ -317,8 +315,7 @@ def run(args):
         ffargs = {'audio_stream': src_audio_stream.id, 'audio_path': src_audio_path, 'audio_rate': args.sample_rate}
         if not args.script_file:
             ffargs['script_stream'] = src_script_stream.id
-            src_script_path = args.source + '.sushi' + src_script_stream.type
-            ffargs['script_path'] = src_script_path
+            ffargs['script_path'] = src_script_path = args.source + '.sushi' + src_script_stream.type
             delete_src_script = True
         else:
             src_script_path = args.script_file
@@ -328,7 +325,7 @@ def run(args):
         src_audio_path = args.source
         src_script_path = args.script_file
 
-    if demux_destination:
+    if not is_wav(args.destination):
         dst_audio_path = args.destination + '.sushi.wav'
         FFmpeg.demux_file(args.destination,
                           audio_path=dst_audio_path,

@@ -173,9 +173,9 @@ def read_timecodes(path):
         return parse_timecodes(file.read())
 
 
-def get_media_info(path, audio=True, subtitles=True, chapters=True):
+def get_media_info(path):
     info = FFmpeg.get_info(path)
-    audio_streams = FFmpeg.get_audio_streams(info) if audio else None
-    subs_streams = FFmpeg.get_subtitles_streams(info) if audio else None
-    chapter_times = FFmpeg.get_chapters_times(info) if audio else None
+    audio_streams = FFmpeg.get_audio_streams(info)
+    subs_streams = FFmpeg.get_subtitles_streams(info)
+    chapter_times = FFmpeg.get_chapters_times(info)
     return MediaInfo(audio_streams, subs_streams, chapter_times)

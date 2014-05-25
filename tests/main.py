@@ -29,6 +29,20 @@ class MainScriptTestCase(unittest.TestCase):
         keys = ['--dst', 'this_totally_does_not_exist_nKWDBN8rUw65QxcCxVnpcMwH5gFy65', '--src', media('nichibros.m4a')]
         self.assertRaisesRegexp(SushiError, self.any_case_regex(r'dest.*exist'), lambda: parse_args_and_run(keys))
 
+    def test_raises_on_script_not_existing(self):
+        keys = ['--src', media('nichibros.m4a'), '--dst', media('nichibros-shifted.m4a'), '--script', media('nKWDBN8rUw65QxcCxVnpcMwH5gFy65')]
+        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*exist'), lambda: parse_args_and_run(keys))
+
+    def test_raises_on_keyframes_not_existing(self):
+        keys = self.get_nichibros()
+        keys.extend(['--keyframes', 'this_totally_does_not_exist_nKWDBN8rUw65QxcCxVnpcMwH5gFy65'])
+        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'keyframes.*exist'), lambda: parse_args_and_run(keys))
+
+    def test_raises_on_chapters_not_existing(self):
+        keys = self.get_nichibros()
+        keys.extend(['--chapters', 'this_totally_does_not_exist_nKWDBN8rUw65QxcCxVnpcMwH5gFy65'])
+        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'chapters.*exist'), lambda: parse_args_and_run(keys))
+
     def test_raises_on_timecodes_not_existing(self):
         keys = self.get_nichibros()
         keys.extend(['--timecodes', 'this_totally_does_not_exist_nKWDBN8rUw65QxcCxVnpcMwH5gFy65'])
