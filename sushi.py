@@ -299,9 +299,9 @@ def run(args):
             timecodes_file = args.timecodes_file
         elif args.dst_fps:
             timecodes_file = None
-        elif src_demuxer.has_video:
-            timecodes_file = args.source + '.sushi.timecodes.txt'
-            src_demuxer.set_timecodes(output_path=timecodes_file)
+        elif dst_demuxer.has_video:
+            timecodes_file = args.destination + '.sushi.timecodes.txt'
+            dst_demuxer.set_timecodes(output_path=timecodes_file)
         else:
             raise SushiError('Fps, timecodes or video files must be provided if keyframes are used')
     else:
