@@ -7,9 +7,9 @@ import sys
 import bisect
 from common import SushiError, get_extension
 
-AudioStreamInfo = namedtuple('AudioStreamInfo', ['id', 'info', 'title'])
+MediaStreamInfo = namedtuple('MediaStreamInfo', ['id', 'info', 'title'])
 SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', 'title'])
-MediaInfo = namedtuple('MediaInfo', ['audio', 'subtitles', 'chapters'])
+MediaInfo = namedtuple('MediaInfo', ['video', 'audio', 'subtitles', 'chapters'])
 
 
 class FFmpeg(object):
@@ -33,20 +33,22 @@ class FFmpeg(object):
         audio_path = kwargs.get('audio_path', None)
         audio_rate = kwargs.get('audio_rate', None)
         if audio_stream is not None:
-            if audio_path is None:
-                raise Exception('Output audio path is not set')
             args.extend(('-map', '0:{0}'.format(audio_stream)))
-        if audio_rate:
-            args.extend(('-ar', str(audio_rate)))
-        args.extend(('-ac', '1', '-acodec', 'pcm_s16le', audio_path))
+            if audio_rate:
+                args.extend(('-ar', str(audio_rate)))
+            args.extend(('-ac', '1', '-acodec', 'pcm_s16le', audio_path))
 
         script_stream = kwargs.get('script_stream', None)
         script_path = kwargs.get('script_path', None)
         if script_stream is not None:
-            if script_path is None:
-                raise Exception('Output subtitles path is not set')
             args.extend(('-map', '0:{0}'.format(script_stream)))
             args.append(script_path)
+
+        video_stream = kwargs.get('video_stream', None)
+        timecodes_path = kwargs.get('timecodes_path', None)
+        if timecodes_path is not None:
+            args.extend(('-map', '0:{0}'.format(video_stream), '-f', 'mkvtimestamp_v2', timecodes_path))
+
         logging.debug('ffmpeg args: {0}'.format(args))
         try:
             process = Popen(args)
@@ -61,7 +63,13 @@ class FFmpeg(object):
     def _get_audio_streams(info):
         streams = re.findall(r'Stream #0:(\d+).*?Audio:(.*?)\r?\n(?:\s*Metadata:\s*\r?\n\s*title\s*:\s*(.*?)\r?\n)?',
                              info)
-        return [AudioStreamInfo(int(x[0]), x[1].strip(), x[2]) for x in streams]
+        return [MediaStreamInfo(int(x[0]), x[1].strip(), x[2]) for x in streams]
+
+    @staticmethod
+    def _get_video_streams(info):
+        streams = re.findall(r'Stream #0:(\d+).*?Video:(.*?)\r?\n(?:\s*Metadata:\s*\r?\n\s*title\s*:\s*(.*?)\r?\n)?',
+                             info)
+        return [MediaStreamInfo(int(x[0]), x[1].strip(), x[2]) for x in streams]
 
     @staticmethod
     def _get_chapters_times(info):
@@ -84,10 +92,19 @@ class FFmpeg(object):
     @classmethod
     def get_media_info(cls, path):
         info = cls.get_info(path)
+        video_streams = cls._get_video_streams(info)
         audio_streams = cls._get_audio_streams(info)
         subs_streams = cls._get_subtitles_streams(info)
         chapter_times = cls._get_chapters_times(info)
-        return MediaInfo(audio_streams, subs_streams, chapter_times)
+        return MediaInfo(video_streams, audio_streams, subs_streams, chapter_times)
+
+
+class MkvToolnix(object):
+    @classmethod
+    def extract_timecodes(cls, mkv_path, stream_idx, output_path):
+        args = ['mkvextract', 'timecodes_v2', mkv_path, '{0}:{1}'.format(stream_idx, output_path)]
+        process = Popen(args)
+        process.wait()
 
 
 class Timecodes(object):
@@ -180,7 +197,7 @@ class Demuxer(object):
         self._path = path
         self._is_wav = get_extension(self._path) == '.wav'
         self._mi = None if self._is_wav else FFmpeg.get_media_info(self._path)
-        self._demux_audio = self._demux_subs = self.make_timecodes = self.make_keyframes = False
+        self._demux_audio = self._demux_subs = self._make_timecodes = self._make_keyframes = False
 
     @property
     def is_wav(self):
@@ -192,6 +209,10 @@ class Demuxer(object):
             return []
         return self._mi.chapters
 
+    @property
+    def has_video(self):
+        return not self.is_wav and self._mi.video
+
     def set_audio(self, stream_idx, output_path, sample_rate):
         self._audio_stream = self._select_stream(self._mi.audio, stream_idx, 'audio')
         self._audio_output_path = output_path
@@ -202,6 +223,10 @@ class Demuxer(object):
         self._script_stream = self._select_stream(self._mi.subtitles, stream_idx, 'subtitles')
         self._script_output_path = output_path
         self._demux_subs = True
+
+    def set_timecodes(self, output_path):
+        self._timecodes_output_path = output_path
+        self._make_timecodes = True
 
     def get_subs_type(self, stream_idx):
         return self._select_stream(self._mi.subtitles, stream_idx, 'subtitles').type
@@ -215,6 +240,19 @@ class Demuxer(object):
         if self._demux_subs:
             ffargs['script_stream'] = self._script_stream.id
             ffargs['script_path'] = self._script_output_path
+
+        if self._make_timecodes and get_extension(self._path).lower() == '.mkv':
+            try:
+                MkvToolnix.extract_timecodes(self._path,
+                                             stream_idx=self._mi.video[0].id,
+                                             output_path=self._timecodes_output_path)
+            except WindowsError as e:
+                if e.errno == 2:
+                    # mkvextract not found, use ffmpeg
+                    ffargs['video_stream'] = self._mi.video[0].id
+                    ffargs['timecodes_path'] = self._timecodes_output_path
+                else:
+                    raise
 
         if ffargs:
             FFmpeg.demux_file(self._path, **ffargs)
@@ -245,3 +283,4 @@ class Demuxer(object):
             raise SushiError("Stream with index {0} doesn't exist in {1}.\n"
                              "Here are all that do:\n"
                              "{2}".format(chosen_idx, self._path, self._format_streams(self._mi.audio)))
+
