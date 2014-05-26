@@ -291,17 +291,19 @@ def run(args):
 
     # selecting keyframes and timecodes
     if args.keyframes_file:
-        if args.timecodes_file:
-            timecodes = Timecodes.from_file(args.timecodes_file)
-        elif args.dst_fps:
-            timecodes = Timecodes.cfr(args.dst_fps)
-        else:
-            raise SushiError('Fps or timecodes file must be provided if keyframes are used')
-
         keyframes = parse_keyframes(args.keyframes_file)
         if not keyframes:
             raise SushiError('No keyframes found in the provided keyframes file')
-        keyframes = [timecodes.get_frame_time(f) for f in keyframes]
+
+        if args.timecodes_file:
+            timecodes_file = args.timecodes_file
+        elif args.dst_fps:
+            timecodes_file = None
+        elif src_demuxer.has_video:
+            timecodes_file = args.source + '.sushi.timecodes.txt'
+            src_demuxer.set_timecodes(output_path=timecodes_file)
+        else:
+            raise SushiError('Fps, timecodes or video files must be provided if keyframes are used')
     else:
         keyframes = None
 
@@ -311,6 +313,10 @@ def run(args):
     dst_demuxer.demux()
 
     try:
+        if keyframes:
+            timecodes = Timecodes.cfr(args.dst_fps) if args.dst_fps else Timecodes.from_file(timecodes_file)
+            keytimes = [timecodes.get_frame_time(f) for f in keyframes]
+
         script = AssScript(src_script_path) if script_extension == '.ass' else SrtScript(src_script_path)
         script.sort_by_time()
 
@@ -335,10 +341,10 @@ def run(args):
                 logging.debug('Group (start={0}, end={1}, lines={2}), shift: {3}'.format(g[0].start, g[-1].end, len(g), g[0].shift))
                 average_shifts(g)
                 if keyframes:
-                    find_keyframes_nearby(g, keyframes)
+                    find_keyframes_nearby(g, keytimes)
                     snap_to_keyframes(g, timecodes)
         elif keyframes:
-            find_keyframes_nearby(events, keyframes)
+            find_keyframes_nearby(events, keytimes)
             snap_to_keyframes(events, timecodes)
 
         apply_shifts(events)
