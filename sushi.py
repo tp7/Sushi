@@ -1,6 +1,6 @@
 import logging
 from common import SushiError, get_extension
-from demux import FFmpeg, get_media_info, read_timecodes, CfrTimecodes
+from demux import FFmpeg, get_media_info, read_timecodes, CfrTimecodes, Demuxer
 from keyframes import parse_keyframes
 from subs import AssScript, SrtScript
 from wav import WavStream
@@ -210,33 +210,10 @@ def apply_shifts(events):
         e.apply_shift()
 
 
-def is_wav(path):
-    return get_extension(path) == '.wav'
-
-
 def check_file_exists(path, file_title):
     if path and not os.path.exists(path):
         raise SushiError("{0} file doesn't exist".format(file_title))
 
-
-def select_stream(streams, chosen_idx, path, stream_type):
-    format_streams = lambda streams: '\n'.join(
-        '{0}{1}: {2}'.format(s.id, ' (%s)' % s.title if s.title else '', s.info) for s in streams)
-
-    if not streams:
-        raise SushiError('No {0} streams found in {1}'.format(stream_type.lower(), path))
-    if chosen_idx is None:
-        if len(streams) > 1:
-            raise SushiError('More than one {0} stream found in {1}.\n'
-                             'You need to specify the exact one to demux. Here are all candidate streams:\n'
-                             '{2}'.format(stream_type.lower(), path, format_streams(streams)))
-        return streams[0]
-    try:
-        return next(x for x in streams if x.id == chosen_idx)
-    except StopIteration:
-        raise SushiError("{0} stream with index {1} doesn't exist in {2}.\n"
-                         'Here are all that do:\n'
-                         '{3}'.format(stream_type, chosen_idx, path, format_streams(streams)))
 
 def run(args):
     format = "%(levelname)s: %(message)s"
@@ -256,35 +233,63 @@ def run(args):
     if args.timecodes_file and args.dst_fps:
         raise SushiError('Both fps and timecodes file cannot be specified at the same time')
 
-    if is_wav(args.source) and not args.script_file:
+    src_demuxer = Demuxer(args.source)
+    dst_demuxer = Demuxer(args.destination)
+
+    if src_demuxer.is_wav and not args.script_file:
         raise SushiError("Script file isn't specified")
 
-    chapter_times = []
-    delete_dst_audio = delete_src_audio = delete_src_script = False
+    # selecting source audio
+    if src_demuxer.is_wav:
+        src_audio_path = args.source
+    else:
+        src_audio_path = args.source + '.sushi.wav'
+        src_demuxer.set_audio(stream_idx=args.src_audio_idx, output_path=src_audio_path, sample_rate=args.sample_rate)
 
-    if not is_wav(args.source):
-        mi = get_media_info(args.source)
-        src_audio_stream = select_stream(mi.audio, args.src_audio_idx, args.source, 'Audio').id
-        chapter_times = mi.chapters
-        if not args.script_file:
-            scr = select_stream(mi.subtitles, args.src_script_idx, args.source, 'Subtitles')
-            src_script_type = scr.type
-            src_script_stream = scr.id
+    # selecting destination audio
+    if dst_demuxer.is_wav:
+        dst_audio_path = args.destination
+    else:
+        dst_audio_path = args.destination + '.sushi.wav'
+        dst_demuxer.set_audio(stream_idx=args.dst_audio_idx, output_path=dst_audio_path, sample_rate=args.sample_rate)
 
+    # selecting source subtitles
     if args.script_file:
-        src_script_type = get_extension(args.script_file)
+        src_script_path = args.script_file
+    else:
+        stype = src_demuxer.get_subs_type(args.src_script_idx)
+        src_script_path = args.source + '.sushi' + stype
+        src_demuxer.set_script(stream_idx=args.src_script_idx, output_path=src_script_path)
 
-    if src_script_type not in ('.ass', '.src'):
+    script_extension = get_extension(src_script_path)
+    if script_extension not in ('.ass', '.src'):
         raise SushiError('Unknown script type')
 
-    if not is_wav(args.destination):
-        mi = get_media_info(args.destination)
-        dst_audio_stream = select_stream(mi.audio, args.dst_audio_idx, args.destination, 'Audio').id
+    # selection destination subtitles
+    if args.output_script:
+        dst_script_path = args.output_script
+        dst_script_extension = get_extension(args.output_script)
+        if dst_script_extension != script_extension:
+            raise SushiError("Source and destination script file types don't match ({0} vs {1})"
+                             .format(script_extension, dst_script_extension))
+    else:
+        dst_script_path = args.destination + '.sushi' + script_extension
 
-    if args.output_script and get_extension(args.output_script) != src_script_type:
-        raise SushiError("Source and destination script file types don't match ({0} vs {1})"
-                         .format(src_script_type, get_extension(args.output_script)))
+    # selecting chapters
+    if args.grouping and not ignore_chapters:
+        if args.chapters_file:
+            if get_extension(args.chapters_file) == '.xml':
+                chapter_times = chapters.get_xml_start_times(args.chapters_file)
+            else:
+                chapter_times = chapters.get_ogm_start_times(args.chapters_file)
+        elif not src_demuxer.is_wav:
+            chapter_times = src_demuxer.chapters
+        else:
+            chapter_times = []
+    else:
+        chapter_times = []
 
+    # selecting keyframes and timecodes
     if args.keyframes_file:
         if args.timecodes_file:
             timecodes = read_timecodes(args.timecodes_file)
@@ -293,47 +298,19 @@ def run(args):
         else:
             raise SushiError('Fps or timecodes file must be provided if keyframes are used')
 
-        kfs = parse_keyframes(args.keyframes_file)
-        if not kfs:
+        keyframes = parse_keyframes(args.keyframes_file)
+        if not keyframes:
             raise SushiError('No keyframes found in the provided keyframes file')
-        kfs = [timecodes.get_frame_time(f) for f in kfs]
+        keyframes = [timecodes.get_frame_time(f) for f in keyframes]
     else:
-        kfs = None
+        keyframes = None
 
-    # after this point nothing should fail so it's safe to start demuxing and other slow operations
+    # after this point nothing should fail so it's safe to start slow operations
+    # like running the actual demuxing
+    src_demuxer.demux()
+    dst_demuxer.demux()
 
-    if not is_wav(args.source):
-        src_audio_path = args.source + '.sushi.wav'
-        ffargs = {'audio_stream': src_audio_stream, 'audio_path': src_audio_path, 'audio_rate': args.sample_rate}
-        if not args.script_file:
-            ffargs['script_stream'] = src_script_stream
-            ffargs['script_path'] = src_script_path = args.source + '.sushi' + src_script_type
-            delete_src_script = True
-        else:
-            src_script_path = args.script_file
-        FFmpeg.demux_file(args.source, **ffargs)
-        delete_src_audio = True
-    else:
-        src_audio_path = args.source
-        src_script_path = args.script_file
-
-    if not is_wav(args.destination):
-        dst_audio_path = args.destination + '.sushi.wav'
-        FFmpeg.demux_file(args.destination,
-                          audio_path=dst_audio_path,
-                          audio_stream=dst_audio_stream,
-                          audio_rate=args.sample_rate)
-        delete_dst_audio = True
-    else:
-        dst_audio_path = args.destination
-
-    if args.grouping and not ignore_chapters and args.chapters_file:
-        if get_extension(args.chapters_file) == '.xml':
-            chapter_times = chapters.get_xml_start_times(args.chapters_file)
-        else:
-            chapter_times = chapters.get_ogm_start_times(args.chapters_file)
-
-    script = AssScript(src_script_path) if src_script_type == '.ass' else SrtScript(src_script_path)
+    script = AssScript(src_script_path) if script_extension == '.ass' else SrtScript(src_script_path)
     script.sort_by_time()
 
     src_stream = WavStream(src_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
@@ -356,27 +333,20 @@ def run(args):
         for g in groups:
             logging.debug('Group (start={0}, end={1}, lines={2}), shift: {3}'.format(g[0].start, g[-1].end, len(g), g[0].shift))
             average_shifts(g)
-            if kfs:
-                find_keyframes_nearby(g, kfs)
+            if keyframes:
+                find_keyframes_nearby(g, keyframes)
                 snap_to_keyframes(g, timecodes)
-    elif kfs:
-        find_keyframes_nearby(events, kfs)
+    elif keyframes:
+        find_keyframes_nearby(events, keyframes)
         snap_to_keyframes(events, timecodes)
 
     apply_shifts(events)
 
-    if not args.output_script:
-        args.output_script = args.destination + '.sushi' + src_script_type
-    script.save_to_file(args.output_script)
+    script.save_to_file(dst_script_path)
 
-    #cleanup
     if args.cleanup:
-        if delete_dst_audio:
-            os.remove(dst_audio_path)
-        if delete_src_audio:
-            os.remove(src_audio_path)
-        if delete_src_script:
-            os.remove(src_script_path)
+        src_demuxer.cleanup()
+        dst_demuxer.cleanup()
 
 
 def create_arg_parser():

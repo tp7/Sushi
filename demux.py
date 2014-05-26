@@ -1,10 +1,11 @@
+import os
 from subprocess import Popen, PIPE
 import re
 from collections import namedtuple
 import logging
 import sys
 import bisect
-from common import SushiError
+from common import SushiError, get_extension
 
 AudioStreamInfo = namedtuple('AudioStreamInfo', ['id', 'info', 'title'])
 SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', 'title'])
@@ -126,7 +127,6 @@ class Timecodes(object):
 
 class CfrTimecodes(object):
     def __init__(self, fps):
-        self.fps = fps
         self.frame_duration = 1.0 / fps
 
     def get_frame_time(self, number):
@@ -179,3 +179,76 @@ def get_media_info(path):
     subs_streams = FFmpeg.get_subtitles_streams(info)
     chapter_times = FFmpeg.get_chapters_times(info)
     return MediaInfo(audio_streams, subs_streams, chapter_times)
+
+
+class Demuxer(object):
+    def __init__(self, path):
+        super(Demuxer, self).__init__()
+        self._path = path
+        self._is_wav = get_extension(self._path) == '.wav'
+        self._mi = None if self._is_wav else get_media_info(self._path)
+        self._demux_audio = self._demux_subs = self.make_timecodes = self.make_keyframes = False
+
+    @property
+    def is_wav(self):
+        return self._is_wav
+
+    @property
+    def chapters(self):
+        if self.is_wav:
+            return []
+        return self._mi.chapters
+
+    def set_audio(self, stream_idx, output_path, sample_rate):
+        self._audio_stream = self._select_stream(self._mi.audio, stream_idx, 'audio')
+        self._audio_output_path = output_path
+        self._audio_sample_rate = sample_rate
+        self._demux_audio = True
+
+    def set_script(self, stream_idx, output_path):
+        self._script_stream = self._select_stream(self._mi.subtitles, stream_idx, 'subtitles')
+        self._script_output_path = output_path
+        self._demux_subs = True
+
+    def get_subs_type(self, stream_idx):
+        return self._select_stream(self._mi.subtitles, stream_idx, 'subtitles').type
+
+    def demux(self):
+        ffargs = {}
+        if self._demux_audio:
+            ffargs['audio_stream'] = self._audio_stream.id
+            ffargs['audio_path'] = self._audio_output_path
+            ffargs['audio_rate'] = self._audio_sample_rate
+        if self._demux_subs:
+            ffargs['script_stream'] = self._script_stream.id
+            ffargs['script_path'] = self._script_output_path
+
+        if ffargs:
+            FFmpeg.demux_file(self._path, **ffargs)
+
+    def cleanup(self):
+        if self._demux_audio:
+            os.remove(self._audio_output_path)
+        if self._demux_subs:
+            os.remove(self._script_output_path)
+
+    @classmethod
+    def _format_streams(cls, streams):
+        return '\n'.join('{0}{1}: {2}'.format(s.id, ' (%s)' % s.title if s.title else '', s.info) for s in streams)
+
+    def _select_stream(self, streams, chosen_idx, name):
+        if not streams:
+            raise SushiError('No {0} streams found in {1}'.format(name, self._path))
+        if chosen_idx is None:
+            if len(streams) > 1:
+                raise SushiError('More than one {0} stream found in {1}.'
+                    'You need to specify the exact one to demux. Here are all candidates:\n'
+                    '{1}'.format(name, self._path, self._format_streams(self._mi.audio)))
+            return streams[0]
+
+        try:
+            return next(x for x in self._mi.audio if x.id == chosen_idx)
+        except StopIteration:
+            raise SushiError("Stream with index {0} doesn't exist in {1}.\n"
+                             "Here are all that do:\n"
+                             "{2}".format(chosen_idx, self._path, self._format_streams(self._mi.audio)))
