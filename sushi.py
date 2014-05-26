@@ -1,6 +1,6 @@
 import logging
 from common import SushiError, get_extension
-from demux import FFmpeg, get_media_info, read_timecodes, CfrTimecodes, Demuxer
+from demux import Timecodes, Demuxer
 from keyframes import parse_keyframes
 from subs import AssScript, SrtScript
 from wav import WavStream
@@ -292,9 +292,9 @@ def run(args):
     # selecting keyframes and timecodes
     if args.keyframes_file:
         if args.timecodes_file:
-            timecodes = read_timecodes(args.timecodes_file)
+            timecodes = Timecodes.from_file(args.timecodes_file)
         elif args.dst_fps:
-            timecodes = CfrTimecodes(args.dst_fps)
+            timecodes = Timecodes.cfr(args.dst_fps)
         else:
             raise SushiError('Fps or timecodes file must be provided if keyframes are used')
 
