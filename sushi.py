@@ -310,43 +310,46 @@ def run(args):
     src_demuxer.demux()
     dst_demuxer.demux()
 
-    script = AssScript(src_script_path) if script_extension == '.ass' else SrtScript(src_script_path)
-    script.sort_by_time()
+    try:
+        script = AssScript(src_script_path) if script_extension == '.ass' else SrtScript(src_script_path)
+        script.sort_by_time()
 
-    src_stream = WavStream(src_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
-    dst_stream = WavStream(dst_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
+        src_stream = WavStream(src_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
+        dst_stream = WavStream(dst_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
 
-    calculate_shifts(src_stream, dst_stream, script.events, window=args.window, fast_skip=args.fast_skip)
+        calculate_shifts(src_stream, dst_stream, script.events, window=args.window, fast_skip=args.fast_skip)
 
-    script.sort_broken()  # avoid processing broken lines with zero shifts
-    events = [x for x in script.events if not x.broken]
+        script.sort_broken()  # avoid processing broken lines with zero shifts
+        events = [x for x in script.events if not x.broken]
 
-    fix_near_borders(events)
-    clip_obviously_wrong(events)
+        fix_near_borders(events)
+        clip_obviously_wrong(events)
 
-    if args.grouping:
-        if not ignore_chapters and chapter_times:
-            groups = groups_from_chapters(events, chapter_times)
-        else:
-            groups = detect_groups(events)
+        if args.grouping:
+            if not ignore_chapters and chapter_times:
+                groups = groups_from_chapters(events, chapter_times)
+            else:
+                groups = detect_groups(events)
 
-        for g in groups:
-            logging.debug('Group (start={0}, end={1}, lines={2}), shift: {3}'.format(g[0].start, g[-1].end, len(g), g[0].shift))
-            average_shifts(g)
-            if keyframes:
-                find_keyframes_nearby(g, keyframes)
-                snap_to_keyframes(g, timecodes)
-    elif keyframes:
-        find_keyframes_nearby(events, keyframes)
-        snap_to_keyframes(events, timecodes)
+            for g in groups:
+                logging.debug('Group (start={0}, end={1}, lines={2}), shift: {3}'.format(g[0].start, g[-1].end, len(g), g[0].shift))
+                average_shifts(g)
+                if keyframes:
+                    find_keyframes_nearby(g, keyframes)
+                    snap_to_keyframes(g, timecodes)
+        elif keyframes:
+            find_keyframes_nearby(events, keyframes)
+            snap_to_keyframes(events, timecodes)
 
-    apply_shifts(events)
+        apply_shifts(events)
 
-    script.save_to_file(dst_script_path)
+        script.save_to_file(dst_script_path)
 
-    if args.cleanup:
-        src_demuxer.cleanup()
-        dst_demuxer.cleanup()
+    except:
+        if args.cleanup:
+            src_demuxer.cleanup()
+            dst_demuxer.cleanup()
+        raise
 
 
 def create_arg_parser():
