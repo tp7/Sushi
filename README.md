@@ -20,7 +20,7 @@ Also, the script won't attempt to search for a line if a line with identical sta
 
 Then, the script will try to split all lines into groups. It can either try to build these groups automatically (lines with similar shift are grouped), or get them from chapters (XML or OGM), provided with `--chapters` argument. This is done because it is very unlikely for every line to have its own shift (unless there's some frame rate problems). Shift values of all events in every group are used to calculate weighted average (where weight is the coefficient of similarity of audio streams, calculated before). Of course you can disable grouping with `--no-grouping` switch.
 
-If keyframes are available, sushi will try to correct the shift time for better scenetiming. You can provide *keyframes of the output file* file using the `--keyframes` arguments. Right now only XviD 2pass stat file format is supported. You also need to provide destination file fps, using the `--fps` argument. Using these values, sushi will first find the closest keyframes before and after every line of the group. Then it will calculate the mean distance of every line to the corresponding keyframes, ignoring any distance greater than 3 frames. If this mean distance is lower than 3/4 of a frame, it will be added to the group shift. Since the shift correction is never greater than a frame, this feature should be relatively safe to use all the time.
+If keyframes are available, sushi will try to correct the shift time for better scenetiming. You can provide *keyframes of the output file* file using the `--keyframes` arguments. Right now only XviD 2pass stat file format is supported. The script also needs to know destination file fps, which can be specified using the `--fps` or `--timecodes` arguments, or extracted from a video file automatically. Using these values, sushi will first find the closest keyframes before and after every line of the group. Then it will calculate the mean distance of every line to the corresponding keyframes, ignoring any distance greater than 3 frames. If this mean distance is lower than 3/4 of a frame, it will be added to the group shift. Since the shift correction is never greater than a frame, this feature should be relatively safe to use all the time.
 
 Finally, sushi applies calculated shift to every line and writes the output file.
 
@@ -44,11 +44,13 @@ By default sushi will try to extract all these things from the files you've prov
 ```
 python sushi.py --src hdtv.mkv --dst bluray.mkv --src-audio 2
 ```
-By default sushi will try to extract audio, subtitles and chapters from the source file and audio from the destination file. You can overwrite this behaviour using `--script` and `--chapters` parameters. Whatever file you specify there will be used instead of anything found in the source. There is no setting to specify audio files.
+By default sushi will try to extract audio, subtitles and chapters from the source file and audio from the destination file. You can overwrite this behavior using `--script` and `--chapters` parameters. Whatever file you specify there will be used instead of anything found in the source. There is no setting to specify audio files.
 ```
 python sushi.py --src hdtv.mkv --dst bluray.mkv --script external.srt
 ```
 If there is some chapters in the provided file but for some reason you don't want to use any chapters at all, you can use write `--chapters none` to disable them. Automatic grouping will be used instead (unless disabled).
+
+When keyframes snapping is used and neither `--fps` nor `--chapters` files are provided, sushi will try to dump timecodes from the destination video file. Mkvextract will be used for this task when available, otherwise the script will fall back to ffmpeg. Do note that timecodes extraction with ffmpeg is ridiculously slow so you really want to have mkvextract available.
 
 After the job is done, sushi will delete all demuxed streams. To avoid this, you can use the `--no-cleanup` switch.
 
@@ -60,12 +62,13 @@ For the time being, the script is provided as-is. I don't know what exact versio
 3. [NumPy 1.8.1][2]
 4. [OpenCV 2.4.9][3] (putting [this file][4] in the same folder as sushi should be enough)
 5. [FFmpeg][5] (only if demuxing is used)
+6. [MkvExtract][6] (optional for faster timecodes extraction when demuxing)
 
 
 ### Limitations
 This script will never be able to property handle frame-by-frame typesetting. If underlying video stream changes (e.g. has different telecine pattern), you might get incorrect output.
 
-This script cannot improve bad timing. If original lines are mistimed, the will be mistimed in the output file too.
+This script cannot improve bad timing. If original lines are mistimed, they will be mistimed in the output file too.
 
 In short, while this might be safe for immediate viewing, you probably shouldn't use it to blindly shift subtitles for permanent storing.
 
@@ -75,3 +78,4 @@ In short, while this might be safe for immediate viewing, you probably shouldn't
   [3]: http://opencv.org/
   [4]: https://dl.dropboxusercontent.com/u/54253260/DoNotDelete/cv2.pyd
   [5]: http://www.ffmpeg.org/download.html
+  [6]: http://www.bunkus.org/videotools/mkvtoolnix/downloads.html
