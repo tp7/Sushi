@@ -360,7 +360,7 @@ def run(args):
 def create_arg_parser():
     parser = argparse.ArgumentParser(description='Sushi - Automatic Subtitle Shifter')
 
-    parser.add_argument('--window', default=10, type=int, dest='window',
+    parser.add_argument('--window', default=10, type=int, metavar='<size>', dest='window',
                         help='Search window size')
     parser.add_argument('--no-grouping', action='store_false', dest='grouping',
                         help='Split events into groups before shifting')
@@ -369,37 +369,37 @@ def create_arg_parser():
     parser.add_argument('--no-fast-skip', action='store_false', dest='fast_skip',
                         help="Don't skip lines with identical timing")
 
-    parser.add_argument('--sample-rate', default=12000, type=int, dest='sample_rate',
+    parser.add_argument('--sample-rate', default=12000, type=int, metavar='<rate>', dest='sample_rate',
                         help='Downsampled audio sample rate')
     parser.add_argument('--sample-type', default='uint8', choices=['float32', 'uint8'], dest='sample_type',
                         help='Downsampled audio representation type')
 
 
-    parser.add_argument('--src-audio', default=None, type=int, dest='src_audio_idx',
+    parser.add_argument('--src-audio', default=None, type=int, metavar='<id>', dest='src_audio_idx',
                         help='Audio stream index of the source video')
-    parser.add_argument('--src-script', default=None, type=int, dest='src_script_idx',
+    parser.add_argument('--src-script', default=None, type=int, metavar='<id>', dest='src_script_idx',
                         help='Script stream index of the source video')
-    parser.add_argument('--dst-audio', default=None, type=int, dest='dst_audio_idx',
+    parser.add_argument('--dst-audio', default=None, type=int, metavar='<id>', dest='dst_audio_idx',
                         help='Audio stream index of the destination video')
     # files
     parser.add_argument('--no-cleanup', action='store_false', dest='cleanup',
                         help="Don't delete demuxed streams")
-    parser.add_argument('--chapters', default=None, dest='chapters_file', metavar='file',
+    parser.add_argument('--chapters', default=None, dest='chapters_file', metavar='<filename>',
                         help="XML or OGM chapters to use instead of any found in the source. 'none' to disable.")
-    parser.add_argument('--script', default=None, dest='script_file', metavar='file',
+    parser.add_argument('--script', default=None, dest='script_file', metavar='<filename>',
                         help='Subtitle file path to use instead of any found in the source')
-    parser.add_argument('--keyframes', default=None, dest='keyframes_file', metavar='file',
+    parser.add_argument('--keyframes', default=None, dest='keyframes_file', metavar='<filename>',
                         help='Keyframes file path to use.')
-    parser.add_argument('--fps', default=None, type=float, dest='dst_fps', metavar='file',
+    parser.add_argument('--fps', default=None, type=float, dest='dst_fps', metavar='<fps>',
                         help='Fps of destination video. Must be provided if keyframes are used.')
-    parser.add_argument('--timecodes', default=None, dest='timecodes_file', metavar='file',
+    parser.add_argument('--timecodes', default=None, dest='timecodes_file', metavar='<filename>',
                         help='Timecodes file to use instead of making one from the source (when possible)')
 
-    parser.add_argument('--src', required=True, dest="source", metavar='file',
+    parser.add_argument('--src', required=True, dest="source", metavar='<filename>',
                         help='Source audio/video')
-    parser.add_argument('--dst', required=True, dest="destination", metavar='file',
+    parser.add_argument('--dst', required=True, dest="destination", metavar='<filename>',
                         help='Destination audio/video')
-    parser.add_argument('-o', '--output', default=None, dest='output_script', metavar='file',
+    parser.add_argument('-o', '--output', default=None, dest='output_script', metavar='<filename>',
                         help='Output script')
 
     return parser
