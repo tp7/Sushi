@@ -351,11 +351,10 @@ def run(args):
 
         script.save_to_file(dst_script_path)
 
-    except:
+    finally:
         if args.cleanup:
             src_demuxer.cleanup()
             dst_demuxer.cleanup()
-        raise
 
 
 def create_arg_parser():
