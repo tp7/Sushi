@@ -15,7 +15,6 @@ from time import time
 import bisect
 
 ALLOWED_ERROR = 0.01
-MAX_KEYFRAME_DISTANCE_FRAMES = 3
 
 
 def abs_diff(a, b):
@@ -172,13 +171,14 @@ def find_keyframes_nearby(events, keyframes):
         after = find_closest_kf(event.end.total_seconds + event.shift)
         event.set_keyframes(before, after)
 
-def snap_to_keyframes(events, timecodes):
+def snap_to_keyframes(events, timecodes, max_kf_distance, max_kf_snapping):
+    max_kf_distance = max(max_kf_distance, max_kf_snapping)
     distances = []
     frame_sizes = []
     for event in events:
         frame_sizes.append(timecodes.get_frame_size(event.start.total_seconds))
         for d in event.get_keyframes_distances():
-            if d is not None and abs(d) < (MAX_KEYFRAME_DISTANCE_FRAMES * frame_sizes[-1]):
+            if d is not None and abs(d) < (max_kf_distance * frame_sizes[-1]):
                 distances.append(d)
 
     mean_fs = np.mean(frame_sizes)
@@ -188,8 +188,7 @@ def snap_to_keyframes(events, timecodes):
     mean = np.mean(distances)
     logging.debug('Mean distance to keyframes: {0}. Mean frame size: {1}'.format(mean, mean_fs))
 
-    max_snap_distance = (3.0 / 4.0) * mean_fs
-    if abs(mean) < max_snap_distance:
+    if abs(mean) < (max_kf_snapping * mean_fs):
         logging.info('Looks close enough to keyframes, snapping')
         for event in events:
             event.adjust_shift(mean)
@@ -342,10 +341,10 @@ def run(args):
                 average_shifts(g)
                 if keyframes:
                     find_keyframes_nearby(g, keytimes)
-                    snap_to_keyframes(g, timecodes)
+                    snap_to_keyframes(g, timecodes, args.max_kf_distance, args.max_kf_snapping)
         elif keyframes:
             find_keyframes_nearby(events, keytimes)
-            snap_to_keyframes(events, timecodes)
+            snap_to_keyframes(events, timecodes, args.max_kf_distance, args.max_kf_snapping)
 
         apply_shifts(events)
 
@@ -364,6 +363,10 @@ def create_arg_parser():
                         help='Search window size')
     parser.add_argument('--no-grouping', action='store_false', dest='grouping',
                         help='Split events into groups before shifting')
+    parser.add_argument('--max-kf-distance', default=3, type=float, metavar='<frames>', dest='max_kf_distance',
+                        help='Maximum distance to keyframe for it to be considered in keyframe snapping [3]')
+    parser.add_argument('--max-kf-snapping', default=0.75, type=float, metavar='<frames>', dest='max_kf_snapping',
+                        help='Maximum keyframe snapping distance [0.75]')
 
     # optimizations
     parser.add_argument('--no-fast-skip', action='store_false', dest='fast_skip',
