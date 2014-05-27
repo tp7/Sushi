@@ -20,8 +20,8 @@ class FFmpeg(object):
             out, err = process.communicate()
             process.wait()
             return err
-        except WindowsError as e:
-            if e.winerror == 2:
+        except OSError as e:
+            if e.errno == 2:
                 raise SushiError("Couldn't invoke ffmpeg, check that it's installed")
             raise
 
@@ -53,8 +53,8 @@ class FFmpeg(object):
         try:
             process = Popen(args)
             process.wait()
-        except WindowsError as e:
-            if e.winerror == 2:
+        except OSError as e:
+            if e.errno == 2:
                 logging.critical("Couldn't invoke ffmpeg, check that it's installed")
                 sys.exit(2)
             raise
@@ -246,7 +246,7 @@ class Demuxer(object):
                 MkvToolnix.extract_timecodes(self._path,
                                              stream_idx=self._mi.video[0].id,
                                              output_path=self._timecodes_output_path)
-            except WindowsError as e:
+            except OSError as e:
                 if e.errno == 2:
                     # mkvextract not found, use ffmpeg
                     ffargs['video_stream'] = self._mi.video[0].id
