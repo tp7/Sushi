@@ -2,3 +2,5 @@
 test
 *.pyc
 tests/media
+dist
+build
