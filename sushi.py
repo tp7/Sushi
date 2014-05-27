@@ -15,6 +15,7 @@ from time import time
 import bisect
 
 ALLOWED_ERROR = 0.01
+MAX_REASONABLE_DIFF = 0.5
 
 
 def abs_diff(a, b):
@@ -131,9 +132,9 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
 
 def clip_obviously_wrong(events):
     for idx, event in enumerate(events):
-        if event.diff < 0.5:  # somewhat random
+        if event.diff < MAX_REASONABLE_DIFF:  # somewhat random
             continue
-        next_sane = next(x for x in events[idx + 1:] if x.diff < 0.5)
+        next_sane = next(x for x in events[idx + 1:] if x.diff < MAX_REASONABLE_DIFF)
 
         # select the one with closest shift
         prev_sane = events[idx - 1]  # first is never broken because it's fixed in borders routine
@@ -145,7 +146,7 @@ def clip_obviously_wrong(events):
 
 def fix_near_borders(events):
     def fix_border(event_list):
-        broken = list(takewhile(lambda x: x.diff > 0.5, event_list))
+        broken = list(takewhile(lambda x: x.diff > MAX_REASONABLE_DIFF, event_list))
         if broken:
             sane = event_list[len(broken)]
             for x in broken:
