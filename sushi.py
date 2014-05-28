@@ -134,7 +134,7 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
 
         last_shift = time_offset = new_time - original_time
         event.set_shift(time_offset, diff)
-        logging.debug('{0}: {1}, diff: {2}'.format(event.start, time_offset, diff))
+        logging.debug('{0}: shift: {1:0.12f}, diff: {2:0.12f}'.format(event.start, time_offset, diff))
 
 
 def clip_obviously_wrong(events):
