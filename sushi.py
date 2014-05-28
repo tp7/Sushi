@@ -15,6 +15,7 @@ from time import time
 import bisect
 
 ALLOWED_ERROR = 0.01
+MAX_GROUP_STD = 0.025
 MAX_REASONABLE_DIFF = 0.5
 
 
@@ -59,14 +60,19 @@ def groups_from_chapters(events, times):
     if not groups[-1]:
         del groups[-1]
 
-    broken_groups = [g for g in groups if abs_diff(g[0].shift, g[-1].shift) > ALLOWED_ERROR]
-    correct_groups = [g for g in groups if g not in broken_groups]
-
-    if broken_groups:
-        for g in broken_groups:
-            logging.warn(u'Shift is very different at the edges of a chapter group, most likely chapters are wrong. Switched to automatic grouping.\n'
-                         'First line in the group: {0}'.format(unicode(g[0])))
+    correct_groups = []
+    broken_found = False
+    for g in groups:
+        std = np.std([e.shift for e in g])
+        if std > MAX_GROUP_STD:
+            logging.warn(u'Shift is not consistent enough withing the chapter group, most likely chapters are wrong (std: {0}).\n'
+                         u'Switching to automated grouping between {1} and {2}'.format(std, g[0].start, g[-1].end))
             correct_groups.extend(detect_groups(g))
+            broken_found = True
+        else:
+            correct_groups.append(g)
+
+    if broken_found:
         correct_groups = sorted(correct_groups, key=lambda g: g[0].start.total_seconds)
 
         i = 0
