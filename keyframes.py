@@ -1,5 +1,4 @@
-import logging
-import sys
+from common import SushiError
 
 
 def parse_scxvid_keyframes(text):
@@ -11,8 +10,7 @@ def parse_keyframes(path):
     if text.find('# XviD 2pass stat file')>=0:
         frames = parse_scxvid_keyframes(text)
     else:
-        logging.critical('Unsupported keyframes type')
-        sys.exit(2)
+        raise SushiError('Unsupported keyframes type')
     if 0 not in frames:
         frames.insert(0, 0)
     return frames

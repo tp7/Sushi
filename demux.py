@@ -3,7 +3,6 @@ from subprocess import Popen, PIPE
 import re
 from collections import namedtuple
 import logging
-import sys
 import bisect
 from common import SushiError, get_extension
 
@@ -55,8 +54,7 @@ class FFmpeg(object):
             process.wait()
         except OSError as e:
             if e.errno == 2:
-                logging.critical("Couldn't invoke ffmpeg, check that it's installed")
-                sys.exit(2)
+                raise SushiError("Couldn't invoke ffmpeg, check that it's installed")
             raise
 
     @staticmethod

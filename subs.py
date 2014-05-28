@@ -1,7 +1,7 @@
 import logging
-import sys
 import codecs
 import os
+from common import SushiError
 
 
 class TimeOffset(object):
@@ -127,8 +127,7 @@ class SrtScript(ScriptBase):
             with codecs.open(path, encoding='utf-8-sig') as file:
                 self.events = [SrtEvent(x) for x in file.read().replace(os.linesep, '\n').split('\n\n') if x]
         except IOError:
-            logging.critical("Script {0} not found".format(path))
-            sys.exit(2)
+            raise SushiError("Script {0} not found".format(path))
 
     def save_to_file(self, path):
         text = '\n\n'.join(unicode(x) for x in self.events)
@@ -197,12 +196,11 @@ class AssScript(ScriptBase):
                     elif low.startswith(u'format:'):
                         continue # ignore it
                     elif not parse_function:
-                        raise RuntimeError("That's some invalid ASS script")
+                        raise SushiError("That's some invalid ASS script")
                     else:
                         parse_function(line)
         except IOError:
-            logging.critical("Script {0} not found".format(path))
-            sys.exit(2)
+            raise SushiError("Script {0} not found".format(path))
 
     def save_to_file(self, path):
         # if os.path.exists(path):

@@ -5,6 +5,7 @@ from chunk import Chunk
 import struct
 from time import time
 import os.path
+from common import SushiError
 
 WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_EXTENSIBLE = 0xFFFE
@@ -17,9 +18,9 @@ class DownmixedWavFile(object):
         try:
             riff = Chunk(self._file, bigendian=False)
             if riff.getname() != 'RIFF':
-                raise Exception('File does not start with RIFF id')
+                raise SushiError('File does not start with RIFF id')
             if riff.read(4) != 'WAVE':
-                raise Exception('Not a WAVE file')
+                raise SushiError('Not a WAVE file')
 
             fmt_chunk_read = False
             data_chink_read = False
@@ -44,7 +45,7 @@ class DownmixedWavFile(object):
                     break
                 chunk.skip()
             if not fmt_chunk_read or not data_chink_read:
-                raise Exception('Invalid WAV file')
+                raise SushiError('Invalid WAV file')
         except:
             if self._file:
                 self._file.close()
@@ -70,7 +71,7 @@ class DownmixedWavFile(object):
             unpacked.view(dtype='int8')[0::2] = bytes[1::3]
             unpacked.view(dtype='int8')[1::2] = bytes[2::3]
         else:
-            raise Exception('Unsupported sample width: {0}'.format(self.sample_width))
+            raise SushiError('Unsupported sample width: {0}'.format(self.sample_width))
 
         if self.channels_count == 1:
             return unpacked
@@ -85,7 +86,7 @@ class DownmixedWavFile(object):
             bits_per_sample = struct.unpack('<H', chunk.read(2))[0]
             self.sample_width = (bits_per_sample + 7) // 8
         else:
-            raise Exception('unknown format: {0}'.format(wFormatTag))
+            raise SushiError('unknown format: {0}'.format(wFormatTag))
         self.frame_size = self.channels_count * self.sample_width
 
 
@@ -94,7 +95,7 @@ class WavStream(object):
 
     def __init__(self, path, sample_rate=12000, sample_type='uint8'):
         if sample_type not in ('float32', 'uint8'):
-            raise RuntimeError('Unknown sample type of WAV stream, must be uint8 or float32')
+            raise SushiError('Unknown sample type of WAV stream, must be uint8 or float32')
 
         file = DownmixedWavFile(path)
         total_seconds = file.frames_count / float(file.framerate)
