@@ -65,8 +65,8 @@ def groups_from_chapters(events, times):
     for g in groups:
         std = np.std([e.shift for e in g])
         if std > MAX_GROUP_STD:
-            logging.warn(u'Shift is not consistent enough withing the chapter group, most likely chapters are wrong (std: {0}).\n'
-                         u'Switching to automated grouping between {1} and {2}'.format(std, g[0].start, g[-1].end))
+            logging.warn(u'Shift is not consistent between {0} and {1}, most likely chapters are wrong (std: {2}). '
+                         u'Switching to automatic grouping.'.format(g[0].start, g[-1].end, std))
             correct_groups.extend(detect_groups(g))
             broken_found = True
         else:
@@ -206,9 +206,9 @@ def average_shifts(events):
     weights = [1 - x.diff for x in events]
     avg, weights_sum = np.average(shifts, weights=weights, returned=True)
     new_diff = 1 - weights_sum / len(events)
-    logging.debug('Average shift set to {0}'.format(avg))
     for e in events:
         e.set_shift(avg, new_diff)
+    return avg
 
 
 def apply_shifts(events):
@@ -344,8 +344,12 @@ def run(args):
                 groups = detect_groups(events)
 
             for g in groups:
-                logging.debug('Group (start={0}, end={1}, lines={2}), shift: {3}'.format(g[0].start, g[-1].end, len(g), g[0].shift))
-                average_shifts(g)
+                start_shift = g[0].shift
+                end_shift = g[-1].shift
+                avg_shift = average_shifts(g)
+                logging.debug(u'Group (start: {0}, end: {1}, lines: {2}), '
+                              u'shifts (start: {3}, end: {4}, average: {5})'
+                              .format(g[0].start, g[-1].end, len(g), start_shift, end_shift, avg_shift))
                 if keyframes:
                     find_keyframes_nearby(g, keytimes)
                     snap_to_keyframes(g, timecodes, args.max_kf_distance, args.max_kf_snapping)
