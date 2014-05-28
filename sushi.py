@@ -348,7 +348,7 @@ def run(args):
                 start_shift = g[0].shift
                 end_shift = g[-1].shift
                 avg_shift = average_shifts(g)
-                logging.debug(u'Group (start: {0}, end: {1}, lines: {2}), '
+                logging.info(u'Group (start: {0}, end: {1}, lines: {2}), '
                               u'shifts (start: {3}, end: {4}, average: {5})'
                               .format(g[0].start, g[-1].end, len(g), start_shift, end_shift, avg_shift))
                 if keyframes:
@@ -424,7 +424,7 @@ def parse_args_and_run(cmd_keys):
     args = create_arg_parser().parse_args(cmd_keys)
     start_time = time()
     run(args)
-    logging.debug('Done in {0}s'.format(time() - start_time))
+    logging.info('Done in {0}s'.format(time() - start_time))
 
 
 if __name__ == '__main__':

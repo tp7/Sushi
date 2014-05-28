@@ -125,7 +125,7 @@ class WavStream(object):
 
         self.data = np.concatenate(arrays, axis=1)
         file.close()
-        logging.debug('Done reading WAV {0} in {1}s'.format(path, time() - before_read))
+        logging.info('Done reading WAV {0} in {1}s'.format(path, time() - before_read))
 
     @property
     def duration_seconds(self):
