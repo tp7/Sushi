@@ -77,7 +77,8 @@ def groups_from_chapters(events, times):
 
         i = 0
         while i < len(correct_groups)-1:
-            if abs_diff(correct_groups[i][-1].shift, correct_groups[i+1][0].shift) < ALLOWED_ERROR:
+            if abs_diff(correct_groups[i][-1].shift, correct_groups[i+1][0].shift) < ALLOWED_ERROR \
+                    and np.std([e.shift for e in correct_groups[i]+correct_groups[i+1]]) < MAX_GROUP_STD:
                 correct_groups[i].extend(correct_groups[i+1])
                 del correct_groups[i+1]
             else:
