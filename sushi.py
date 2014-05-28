@@ -2,7 +2,7 @@ import logging
 from common import SushiError, get_extension
 from demux import Timecodes, Demuxer
 from keyframes import parse_keyframes
-from subs import AssScript, SrtScript
+from subs import AssScript, SrtScript, TimeOffset
 from wav import WavStream
 import sys
 from collections import namedtuple
@@ -45,8 +45,8 @@ def detect_groups(events):
 
 def groups_from_chapters(events, times):
     times = list(times)  # copy
+    logging.debug(u'Chapter start points: {0}'.format([TimeOffset.from_seconds(t) for t in times]))
     times.append(36000000000)  # very large event at the end
-    logging.debug('Chapter start points: {0}'.format(times))
     groups = [[]]
     current_chapter = 0
 
