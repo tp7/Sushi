@@ -89,8 +89,8 @@ class GroupSplittingTestCase(unittest.TestCase):
         self.assertEqual(10, len(groups[0]))
         self.assertEqual(11, len(groups[1]))
 
-    def test_merges_small_groups_with_closest_large_skipping_wrong_groups(self):
-        events = [self.event(0.5)]*10 + [self.event(0.8)] + [self.event(0.9)]*2 + [self.event(1.0)] * 10
+    def test_merges_two_consecutive_small_groups_with_closest_large(self):
+        events = [self.event(0.5)]*10 + [self.event(0.9)]*2 + [self.event(0.7)] + [self.event(1.0)] * 10
         groups = detect_groups(events, min_group_size=3)
         self.assertEqual(10, len(groups[0]))
         self.assertEqual(13, len(groups[1]))

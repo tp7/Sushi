@@ -27,7 +27,7 @@ def smooth_events(events, window_size):
     if window_size % 2 != 1:
         raise SushiError('Median window size should be odd')
     half_window = window_size // 2
-    for x in xrange(len(events)):
+    for x in xrange(half_window, len(events)-half_window):
       start = max(0, x-half_window)
       end = x+half_window+1
       events[x].shift = np.median([e.shift for e in events[start:end]])
