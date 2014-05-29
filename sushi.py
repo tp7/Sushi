@@ -23,7 +23,7 @@ def abs_diff(a, b):
     return max(a, b) - min(a, b)
 
 
-def detect_groups(events):
+def detect_groups(events, min_group_size):
     Group = namedtuple('Group', ['start', 'end'])
 
     start_index = 0
@@ -37,13 +37,13 @@ def detect_groups(events):
 
     # last group
     if start_index < len(events) - 2:
-        groups.append(Group(start_index, len(events) - 2))
+        groups.append(Group(start_index, len(events) - 1))
 
     # todo: merge very short groups
     return [events[g.start:g.end + 1] for g in groups]
 
 
-def groups_from_chapters(events, times):
+def groups_from_chapters(events, times, min_auto_group_size):
     times = list(times)  # copy
     logging.debug(u'Chapter start points: {0}'.format([TimeOffset.from_seconds(t) for t in times]))
     times.append(36000000000)  # very large event at the end
@@ -67,7 +67,7 @@ def groups_from_chapters(events, times):
         if std > MAX_GROUP_STD:
             logging.warn(u'Shift is not consistent between {0} and {1}, most likely chapters are wrong (std: {2}). '
                          u'Switching to automatic grouping.'.format(g[0].start, g[-1].end, std))
-            correct_groups.extend(detect_groups(g))
+            correct_groups.extend(detect_groups(g, min_auto_group_size))
             broken_found = True
         else:
             correct_groups.append(g)
@@ -340,9 +340,9 @@ def run(args):
 
         if args.grouping:
             if not ignore_chapters and chapter_times:
-                groups = groups_from_chapters(events, chapter_times)
+                groups = groups_from_chapters(events, chapter_times, args.min_group_size)
             else:
-                groups = detect_groups(events)
+                groups = detect_groups(events, args.min_group_size)
 
             for g in groups:
                 start_shift = g[0].shift
@@ -375,6 +375,8 @@ def create_arg_parser():
                         help='Search window size')
     parser.add_argument('--no-grouping', action='store_false', dest='grouping',
                         help='Split events into groups before shifting')
+    parser.add_argument('--min-group-size', default=1, type=int, dest='min_group_size',
+                        help='Minimum size of automatic group')
     parser.add_argument('--max-kf-distance', default=3, type=float, metavar='<frames>', dest='max_kf_distance',
                         help='Maximum distance to keyframe for it to be considered in keyframe snapping [3]')
     parser.add_argument('--max-kf-snapping', default=0.75, type=float, metavar='<frames>', dest='max_kf_snapping',

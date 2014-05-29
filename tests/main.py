@@ -1,8 +1,9 @@
+from collections import namedtuple
 import os
 import re
 import unittest
 from common import SushiError
-from sushi import parse_args_and_run
+from sushi import parse_args_and_run, detect_groups
 
 here = os.path.dirname(os.path.abspath(__file__))
 
@@ -60,3 +61,46 @@ class MainScriptTestCase(unittest.TestCase):
         keys = self.get_nichibros()
         keys.extend(['--timecodes',  media('nichibros.tc.txt'), '--fps', '23.976'])
         self.assertRaisesRegexp(SushiError, self.any_case_regex(r'timecodes'), lambda: parse_args_and_run(keys))
+
+
+class GroupSplittingTestCase(unittest.TestCase):
+    FakeEvent = namedtuple('FakeEvent', ['shift'])
+
+    def event(self, shift):
+        return self.FakeEvent(shift)
+
+    def test_splits_three_simple_groups(self):
+        events = [self.event(0.5)] * 3 + [self.event(1.0)] * 10 + [self.event(0.5)]*5
+        groups = detect_groups(events, min_group_size=1)
+        self.assertEqual(3, len(groups[0]))
+        self.assertEqual(10, len(groups[1]))
+        self.assertEqual(5, len(groups[2]))
+
+    def test_single_group_for_all_events(self):
+        events = [self.event(0.5)] * 10
+        groups = detect_groups(events, min_group_size=1)
+        self.assertEqual(10, len(groups[0]))
+
+    def test_merges_small_groups_with_closest_large(self):
+        events = [self.event(0.5)]*10 + [self.event(0.8)] + [self.event(1.0)] * 10
+        groups = detect_groups(events, min_group_size=5)
+        self.assertEqual(10, len(groups[0]))
+        self.assertEqual(11, len(groups[1]))
+
+    def test_merges_small_groups_with_closest_large_skipping_wrong_groups(self):
+        events = [self.event(0.5)]*10 + [self.event(0.8)] + [self.event(0.9)]*2 + [self.event(1.0)] * 10
+        groups = detect_groups(events, min_group_size=5)
+        self.assertEqual(10, len(groups[0]))
+        self.assertEqual(13, len(groups[1]))
+
+    def test_merges_small_first_group_property(self):
+        events = [self.event(0.5)] + [self.event(10)] * 10 + [self.event(5)] * 10
+        groups = detect_groups(events, min_group_size=5)
+        self.assertEqual(11, len(groups[0]))
+        self.assertEqual(10, len(groups[1]))
+
+    def test_merges_small_last_group_property(self):
+        events = [self.event(0.5)]*10 + [self.event(10)] * 10 + [self.event(5)]
+        groups = detect_groups(events, min_group_size=5)
+        self.assertEqual(10, len(groups[0]))
+        self.assertEqual(11, len(groups[1]))
