@@ -34,25 +34,48 @@ def smooth_events(events, window_size):
 
 
 def detect_groups(events, min_group_size):
-    Group = namedtuple('Group', ['start', 'end'])
-
     smooth_events(events, 7)  # smoothing events for better group detection
 
-    start_index = 0
     last_shift = events[0].shift
+    current_group = []
     groups = []
-    for idx, event in enumerate(events):
-        if abs_diff(event.shift, last_shift) > ALLOWED_ERROR:
-            groups.append(Group(start_index, idx - 1))
-            last_shift = event.shift
-            start_index = idx
+    for e in events:
+        if abs_diff(e.shift, last_shift) > ALLOWED_ERROR:
+            groups.append(current_group)
+            current_group = [e]
+            last_shift = e.shift
+        else:
+            current_group.append(e)
 
-    # last group
-    if start_index < len(events) - 2:
-        groups.append(Group(start_index, len(events) - 1))
+    if current_group:
+        groups.append(current_group)
 
-    # todo: merge very short groups
-    return [events[g.start:g.end + 1] for g in groups]
+    if not any(g for g in groups if len(g) >= min_group_size):
+        return groups  # not a single large group to merge into
+
+    large = []
+    groups = iter(groups)
+    a = next(groups, None)
+    while a is not None:
+        if len(a) >= min_group_size:
+            large.append(a)
+            a = next(groups, None)
+        else:
+            small = []
+            while a and len(a) < min_group_size:
+                small.extend(a)
+                a = next(groups, None)
+
+            if not large:
+                a = small + a  # no large groups before, extend the next one
+            elif not a:
+                large[-1].extend(small)  # next group doesn't exist, extend the previous one
+            elif abs_diff(a[0].shift, small[-1].shift) < abs_diff(large[-1][-1].shift, small[0].shift):
+                a = small + a  # next group has closer diff then the next one
+            else:
+                large[-1].extend(small)
+
+    return large
 
 
 def groups_from_chapters(events, times, min_auto_group_size):

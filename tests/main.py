@@ -68,6 +68,9 @@ class GroupSplittingTestCase(unittest.TestCase):
         def __init__(self, shift):
             self.shift = shift
 
+        def __repr__(self):
+            return repr(self.shift)
+
     def event(self, shift):
         return self.FakeEvent(shift)
 
@@ -90,10 +93,10 @@ class GroupSplittingTestCase(unittest.TestCase):
         self.assertEqual(11, len(groups[1]))
 
     def test_merges_two_consecutive_small_groups_with_closest_large(self):
-        events = [self.event(0.5)]*10 + [self.event(0.9)]*2 + [self.event(0.7)] + [self.event(1.0)] * 10
-        groups = detect_groups(events, min_group_size=3)
-        self.assertEqual(10, len(groups[0]))
-        self.assertEqual(13, len(groups[1]))
+        events = [self.event(0.5)]*20 + [self.event(0.9)]*10 + [self.event(0.7)]*10 + [self.event(1.0)] * 20
+        groups = detect_groups(events, min_group_size=15)
+        self.assertEqual(20, len(groups[0]))
+        self.assertEqual(40, len(groups[1]))
 
     def test_merges_small_first_group_property(self):
         events = [self.event(0.5)] + [self.event(10)] * 10 + [self.event(5)] * 10
