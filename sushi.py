@@ -46,9 +46,7 @@ def detect_groups(events, min_group_size):
             last_shift = e.shift
         else:
             current_group.append(e)
-
-    if current_group:
-        groups.append(current_group)
+    groups.append(current_group)
 
     if not any(g for g in groups if len(g) >= min_group_size):
         return groups  # not a single large group to merge into
