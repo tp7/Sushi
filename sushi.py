@@ -5,7 +5,6 @@ from keyframes import parse_keyframes
 from subs import AssScript, SrtScript, TimeOffset
 from wav import WavStream
 import sys
-from collections import namedtuple
 from itertools import takewhile
 import numpy as np
 import argparse
@@ -20,17 +19,18 @@ MAX_REASONABLE_DIFF = 0.5
 
 
 def abs_diff(a, b):
-    return max(a, b) - min(a, b)
+    return abs(a - b)
+
 
 # todo: implement this as a running median
 def smooth_events(events, window_size):
     if window_size % 2 != 1:
         raise SushiError('Median window size should be odd')
     half_window = window_size // 2
-    for x in xrange(half_window, len(events)-half_window):
-      start = max(0, x-half_window)
-      end = x+half_window+1
-      events[x].shift = np.median([e.shift for e in events[start:end]])
+    for x in xrange(half_window, len(events) - half_window):
+        start = max(0, x - half_window)
+        end = x + half_window + 1
+        events[x].shift = np.median([e.shift for e in events[start:end]])
 
 
 def detect_groups(events, min_group_size):
@@ -109,11 +109,11 @@ def groups_from_chapters(events, times, min_auto_group_size):
         correct_groups = sorted(correct_groups, key=lambda g: g[0].start.total_seconds)
 
         i = 0
-        while i < len(correct_groups)-1:
-            if abs_diff(correct_groups[i][-1].shift, correct_groups[i+1][0].shift) < ALLOWED_ERROR \
-                    and np.std([e.shift for e in correct_groups[i]+correct_groups[i+1]]) < MAX_GROUP_STD:
-                correct_groups[i].extend(correct_groups[i+1])
-                del correct_groups[i+1]
+        while i < len(correct_groups) - 1:
+            if abs_diff(correct_groups[i][-1].shift, correct_groups[i + 1][0].shift) < ALLOWED_ERROR \
+                    and np.std([e.shift for e in correct_groups[i] + correct_groups[i + 1]]) < MAX_GROUP_STD:
+                correct_groups[i].extend(correct_groups[i + 1])
+                del correct_groups[i + 1]
             else:
                 i += 1
 
@@ -156,8 +156,8 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
         diff = new_time = None
         if small_window < window:
             diff, new_time = dst_stream.find_substream(tv_audio,
-                                                   start_time=start_point - small_window,
-                                                   end_time=start_point + small_window)
+                                                       start_time=start_point - small_window,
+                                                       end_time=start_point + small_window)
 
         # checking if times are close enough to last shift - no point in re-searching with full window if it's in the same group
         if not new_time or abs_diff(new_time - original_time, last_shift) > ALLOWED_ERROR:
@@ -211,6 +211,7 @@ def find_keyframes_nearby(events, keyframes):
         before = find_closest_kf(event.start.total_seconds + event.shift)
         after = find_closest_kf(event.end.total_seconds + event.shift)
         event.set_keyframes(before, after)
+
 
 def snap_to_keyframes(events, timecodes, max_kf_distance, max_kf_snapping):
     max_kf_distance = max(max_kf_distance, max_kf_snapping)
@@ -382,8 +383,8 @@ def run(args):
                 end_shift = g[-1].shift
                 avg_shift = average_shifts(g)
                 logging.info(u'Group (start: {0}, end: {1}, lines: {2}), '
-                              u'shifts (start: {3}, end: {4}, average: {5})'
-                              .format(g[0].start, g[-1].end, len(g), start_shift, end_shift, avg_shift))
+                             u'shifts (start: {3}, end: {4}, average: {5})'
+                             .format(g[0].start, g[-1].end, len(g), start_shift, end_shift, avg_shift))
                 if keyframes:
                     find_keyframes_nearby(g, keytimes)
                     snap_to_keyframes(g, timecodes, args.max_kf_distance, args.max_kf_snapping)
@@ -423,7 +424,6 @@ def create_arg_parser():
                         help='Downsampled audio sample rate')
     parser.add_argument('--sample-type', default='uint8', choices=['float32', 'uint8'], dest='sample_type',
                         help='Downsampled audio representation type')
-
 
     parser.add_argument('--src-audio', default=None, type=int, metavar='<id>', dest='src_audio_idx',
                         help='Audio stream index of the source video')
