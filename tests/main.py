@@ -64,7 +64,9 @@ class MainScriptTestCase(unittest.TestCase):
 
 
 class GroupSplittingTestCase(unittest.TestCase):
-    FakeEvent = namedtuple('FakeEvent', ['shift'])
+    class FakeEvent(object):
+        def __init__(self, shift):
+            self.shift = shift
 
     def event(self, shift):
         return self.FakeEvent(shift)
@@ -89,7 +91,7 @@ class GroupSplittingTestCase(unittest.TestCase):
 
     def test_merges_small_groups_with_closest_large_skipping_wrong_groups(self):
         events = [self.event(0.5)]*10 + [self.event(0.8)] + [self.event(0.9)]*2 + [self.event(1.0)] * 10
-        groups = detect_groups(events, min_group_size=5)
+        groups = detect_groups(events, min_group_size=3)
         self.assertEqual(10, len(groups[0]))
         self.assertEqual(13, len(groups[1]))
 
@@ -104,3 +106,9 @@ class GroupSplittingTestCase(unittest.TestCase):
         groups = detect_groups(events, min_group_size=5)
         self.assertEqual(10, len(groups[0]))
         self.assertEqual(11, len(groups[1]))
+
+    def test_does_nothing_when_there_is_only_wrong_groups(self):
+        events = [self.event(0.5)]*2 + [self.event(10)] * 3
+        groups = detect_groups(events, min_group_size=5)
+        self.assertEqual(2, len(groups[0]))
+        self.assertEqual(3, len(groups[1]))

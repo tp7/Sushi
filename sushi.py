@@ -22,9 +22,21 @@ MAX_REASONABLE_DIFF = 0.5
 def abs_diff(a, b):
     return max(a, b) - min(a, b)
 
+# todo: implement this as a running median
+def smooth_events(events, window_size):
+    if window_size % 2 != 1:
+        raise SushiError('Median window size should be odd')
+    half_window = window_size // 2
+    for x in xrange(len(events)):
+      start = max(0, x-half_window)
+      end = x+half_window+1
+      events[x].shift = np.median([e.shift for e in events[start:end]])
+
 
 def detect_groups(events, min_group_size):
     Group = namedtuple('Group', ['start', 'end'])
+
+    smooth_events(events, 7)  # smoothing events for better group detection
 
     start_index = 0
     last_shift = events[0].shift
