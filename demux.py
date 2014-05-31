@@ -272,13 +272,13 @@ class Demuxer(object):
             if len(streams) > 1:
                 raise SushiError('More than one {0} stream found in {1}.'
                                  'You need to specify the exact one to demux. Here are all candidates:\n'
-                                 '{1}'.format(name, self._path, self._format_streams(self._mi.audio)))
+                                 '{2}'.format(name, self._path, self._format_streams(streams)))
             return streams[0]
 
         try:
-            return next(x for x in self._mi.audio if x.id == chosen_idx)
+            return next(x for x in streams if x.id == chosen_idx)
         except StopIteration:
             raise SushiError("Stream with index {0} doesn't exist in {1}.\n"
                              "Here are all that do:\n"
-                             "{2}".format(chosen_idx, self._path, self._format_streams(self._mi.audio)))
+                             "{2}".format(chosen_idx, self._path, self._format_streams(streams)))
 
