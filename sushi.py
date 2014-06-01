@@ -138,11 +138,13 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast
         elif fast_skip:
             # assuming scripts are sorted by start time so we don't search the entire collection
             same_start = lambda x: event.start == x.start
-            processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end), None)
-            if processed:
+            try:
+                processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end), None)
+                event.link_event(processed)
                 # logging.debug('{0}-{1}: skipped because identical to already processed (typesetting?)'
                 #               .format(format_time(event.start), format_time(event.end)))
-                event.link_event(processed)
+            except StopIteration:
+                pass
 
     events = (e for e in events if not e.linked and not e.broken)
 
@@ -166,6 +168,15 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast
                 event = next(events, None)
 
             search_groups.append(group)
+
+    passed_groups = []
+    for idx, group in enumerate(search_groups):
+        try:
+            other = next(x for x in reversed(search_groups[:idx]) if x[0].start <= group[0].start and x[-1].end >= group[-1].end)
+            for event in group:
+                event.link_event(other[0])
+        except StopIteration:
+            passed_groups.append(group)
 
     for search_group in search_groups:
         tv_audio = src_stream.get_substream(search_group[0].start, search_group[-1].end)
