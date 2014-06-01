@@ -78,21 +78,20 @@ def detect_groups(events, min_group_size):
 
 
 def groups_from_chapters(events, times, min_auto_group_size):
-    times = list(times)  # copy
     logging.debug(u'Chapter start points: {0}'.format([format_time(t) for t in times]))
-    times.append(36000000000)  # very large event at the end
     groups = [[]]
-    current_chapter = 0
+    chapter_times = iter(times[1:] + [36000000000])  # very large event at the end
+    current_chapter = next(chapter_times)
 
     for event in events:
-        if event.start > times[current_chapter + 1]:
+        if event.end > current_chapter:
             groups.append([])
-            current_chapter += 1
+            while event.end > current_chapter:
+                current_chapter = next(chapter_times)
 
         groups[-1].append(event)
 
-    if not groups[-1]:
-        del groups[-1]
+    groups = [g for g in groups if g]
 
     correct_groups = []
     broken_found = False
@@ -178,7 +177,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast
         except StopIteration:
             passed_groups.append(group)
 
-    for search_group in search_groups:
+    for search_group in passed_groups:
         tv_audio = src_stream.get_substream(search_group[0].start, search_group[-1].end)
 
         original_time = search_group[0].start
