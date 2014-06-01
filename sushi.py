@@ -16,7 +16,8 @@ import bisect
 ALLOWED_ERROR = 0.01
 MAX_GROUP_STD = 0.025
 MAX_REASONABLE_DIFF = 0.5
-MAX_FBF_DURATION = 1001.0 / 24000.0 * 1.5  # 1.5 frames at 23.976
+MAX_FBF_DURATION = 1001.0 / 24000.0 * 1.5 # 1.5 frames at 23.976
+MAX_FBF_DISTANCE = 1001.0 / 24000.0 * 0.5 # 0.5 frames at 23.976
 
 
 def abs_diff(a, b):
@@ -153,9 +154,16 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
             idx += 1
             continue
 
-        tv_audio = src_stream.get_substream(event.start, event.end)
+        search_group = [event]
+        idx+=1
+        if event.duration < MAX_FBF_DURATION:
+            while idx < len(events) and events[idx].duration < MAX_FBF_DURATION and abs_diff(events[idx].start, search_group[-1].end) < MAX_FBF_DISTANCE:
+                search_group.append(events[idx])
+                idx += 1
 
-        original_time = event.start
+        tv_audio = src_stream.get_substream(search_group[0].start, search_group[-1].end)
+
+        original_time = search_group[0].start
         start_point = original_time + last_shift
 
         # searching with smaller window
@@ -172,11 +180,13 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
                                                        end_time=start_point + window)
 
         last_shift = time_offset = new_time - original_time
-        event.set_shift(time_offset, diff)
-        logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
-                      .format(format_time(event.start), format_time(event.end), time_offset, diff))
 
-        idx+=1
+        for e in search_group:
+            e.set_shift(time_offset, diff)
+            logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
+                          .format(format_time(e.start), format_time(e.end), time_offset, diff))
+
+
 
 
 def clip_obviously_wrong(events):
