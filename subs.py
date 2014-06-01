@@ -20,6 +20,7 @@ class ScriptEventBase(object):
     def mark_broken(self):
         self.broken = True
 
+    @property
     def duration(self):
         return self.end - self.start
 
