@@ -60,14 +60,15 @@ class DownmixedWavFile(object):
             self._file = None
 
     def readframes(self, count):
+        # always reads formats as unsigned to increase sample values range for better matching
         if not count:
             return ''
         data = self._file.read(count * self.frame_size)
         if self.sample_width == 2:
-            unpacked = np.fromstring(data, dtype=np.int16)
+            unpacked = np.fromstring(data, dtype=np.uint16)
         elif self.sample_width == 3:
             bytes = np.ndarray(len(data), 'int8', data)
-            unpacked = np.zeros(len(data) / 3, np.int16)
+            unpacked = np.zeros(len(data) / 3, np.uint16)
             unpacked.view(dtype='int8')[0::2] = bytes[1::3]
             unpacked.view(dtype='int8')[1::2] = bytes[2::3]
         else:
