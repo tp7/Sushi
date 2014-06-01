@@ -245,10 +245,11 @@ def snap_to_keyframes(events, timecodes, max_kf_distance, max_kf_snapping):
         logging.info('No lines close enough to keyframes. Mean frame size: {0}'.format(mean_fs))
         return
     mean = np.mean(distances)
-    logging.debug('Mean distance to keyframes: {0}. Mean frame size: {1}'.format(mean, mean_fs))
+    snap = abs(mean) < (max_kf_snapping * mean_fs)
+    logging.info('{0} to keyframes [distance: {1}, frame size: {2}]'
+                  .format('Snapping' if snap else 'Not snapping', mean, mean_fs))
 
-    if abs(mean) < (max_kf_snapping * mean_fs):
-        logging.info('Looks close enough to keyframes, snapping')
+    if snap:
         for event in events:
             event.adjust_shift(mean)
 
