@@ -30,7 +30,8 @@ def smooth_events(events, window_size):
     for x in xrange(half_window, len(events) - half_window):
         start = max(0, x - half_window)
         end = x + half_window + 1
-        events[x].shift = np.median([e.shift for e in events[start:end]])
+        med = np.median([e.shift for e in events[start:end]])
+        events[x].set_shift(med, events[x].diff)
 
 
 def detect_groups(events, min_group_size):
@@ -133,7 +134,7 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip, max_ts_d
             if idx == 0:
                 event.mark_broken()
             else:
-                event.link_to_event(events[idx-1])
+                event.link_event(events[idx-1])
         elif fast_skip:
             # assuming scripts are sorted by start time so we don't search the entire collection
             same_start = lambda x: event.start == x.start
@@ -141,7 +142,7 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip, max_ts_d
             if processed:
                 # logging.debug('{0}-{1}: skipped because identical to already processed (typesetting?)'
                 #               .format(format_time(event.start), format_time(event.end)))
-                event.link_to_event(processed)
+                event.link_event(processed)
 
     linked_events = [e for e in events if e.linked]
     events = [e for e in events if not e.linked and not e.broken]
@@ -182,10 +183,6 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip, max_ts_d
             logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
                           .format(format_time(e.start), format_time(e.end), time_offset, diff))
 
-    # todo: links should be resolved at the end of processing
-    for e in linked_events:
-        e.resolve_link()
-
 
 def clip_obviously_wrong(events):
     for idx, event in enumerate(events):
@@ -196,9 +193,9 @@ def clip_obviously_wrong(events):
         # select the one with closest shift
         prev_sane = events[idx - 1]  # first is never broken because it's fixed in borders routine
         if abs_diff(prev_sane.shift, event.shift) < abs_diff(next_sane.shift, event.shift):
-            event.copy_shift_from(prev_sane)
+            event.link_event(prev_sane)
         else:
-            event.copy_shift_from(next_sane)
+            event.link_event(next_sane)
 
 
 def fix_near_borders(events):
@@ -207,7 +204,7 @@ def fix_near_borders(events):
         if broken:
             sane = event_list[len(broken)]
             for x in broken:
-                x.copy_shift_from(sane)
+                x.link_event(sane)
 
     fix_border(events)
     fix_border(list(reversed(events)))

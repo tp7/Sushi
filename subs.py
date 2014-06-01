@@ -11,9 +11,9 @@ def _parse_ass_time(string):
 class ScriptEventBase(object):
     def __init__(self, start, end):
         super(ScriptEventBase, self).__init__()
-        self.shift = 0
+        self._shift = 0
         self.broken = False
-        self.diff = 1
+        self._diff = 1
         self.start = start
         self.end = end
         self._linked_event = None
@@ -22,30 +22,35 @@ class ScriptEventBase(object):
         self.broken = True
 
     @property
+    def shift(self):
+        return self._linked_event.shift if self.linked else self._shift
+
+    @property
+    def diff(self):
+        return self._linked_event.diff if self.linked else self._diff
+
+    @property
     def duration(self):
         return self.end - self.start
 
     def apply_shift(self):
-        if self.shift:
-            self.start += self.shift
-            self.end += self.shift
+        self.start += self.shift
+        self.end += self.shift
 
     def set_shift(self, shift, audio_diff):
-        self.shift = shift
-        self.diff = audio_diff
+        self._shift = shift
+        self._diff = audio_diff
 
-    def copy_shift_from(self, other):
-        self.broken = other.broken
-        self.shift = other.shift
-        self.diff = other.diff
-
-    def link_to_event(self, other):
+    def link_event(self, other):
         self._linked_event = other
 
-    def resolve_link(self):
+    def _resolve_link(self):
         if not self.linked:
             raise Exception('This is a bug')
-        self.copy_shift_from(self._linked_event)
+        self.broken = self._linked_event.broken
+        self._shift = self._linked_event.shift
+        self._diff = self._linked_event.diff
+        self._linked_event = None
 
     @property
     def linked(self):
@@ -61,7 +66,9 @@ class ScriptEventBase(object):
         return (p,n)
 
     def adjust_shift(self, value):
-        self.shift += value
+        if self.linked:
+            self._resolve_link()
+        self._shift += value
 
 class ScriptBase(object):
     def sort_broken(self):
