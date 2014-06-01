@@ -16,8 +16,6 @@ import bisect
 ALLOWED_ERROR = 0.01
 MAX_GROUP_STD = 0.025
 MAX_REASONABLE_DIFF = 0.5
-MAX_FBF_DURATION = 1001.0 / 24000.0 * 2.5  # 2.5 frames at 23.976
-MAX_FBF_DISTANCE = 1001.0 / 24000.0 * 8.5  # 0.5 frames at 23.976
 
 
 def abs_diff(a, b):
@@ -122,7 +120,7 @@ def groups_from_chapters(events, times, min_auto_group_size):
     return correct_groups
 
 
-def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
+def calculate_shifts(src_stream, dst_stream, events, window, fast_skip, max_ts_duration, max_ts_distance):
     small_window = 2
     last_shift = 0
 
@@ -154,8 +152,8 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
 
         search_group = [event]
         idx += 1
-        if event.duration < MAX_FBF_DURATION:
-            while idx < len(events) and events[idx].duration < MAX_FBF_DURATION and abs_diff(events[idx].start, search_group[-1].end) < MAX_FBF_DISTANCE:
+        if event.duration < max_ts_duration:
+            while idx < len(events) and events[idx].duration < max_ts_duration and abs(events[idx].start - search_group[-1].end) < max_ts_distance:
                 search_group.append(events[idx])
                 idx += 1
 
@@ -383,7 +381,11 @@ def run(args):
         src_stream = WavStream(src_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
         dst_stream = WavStream(dst_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
 
-        calculate_shifts(src_stream, dst_stream, script.events, window=args.window, fast_skip=args.fast_skip)
+        calculate_shifts(src_stream, dst_stream, script.events,
+                         window=args.window,
+                         fast_skip=args.fast_skip,
+                         max_ts_duration=args.max_ts_duration,
+                         max_ts_distance=args.max_ts_distance)
 
         script.sort_broken()  # avoid processing broken lines with zero shifts
         events = [x for x in script.events if not x.broken]
@@ -434,6 +436,13 @@ def create_arg_parser():
                         help='Maximum distance to keyframe for it to be considered in keyframe snapping [3]')
     parser.add_argument('--max-kf-snapping', default=0.75, type=float, metavar='<frames>', dest='max_kf_snapping',
                         help='Maximum keyframe snapping distance [0.75]')
+
+     # 2.5 frames at 23.976
+    parser.add_argument('--max-ts-duration', default=1001.0 / 24000.0 * 2.5, type=float, metavar='<seconds>', dest='max_ts_duration',
+                        help='Maximum duration of a line to be considered typesetting')
+    # 5 frames at 23.976
+    parser.add_argument('--max-ts-distance', default=1001.0 / 24000.0 * 5, type=float, metavar='<seconds>', dest='max_ts_distance',
+                        help='Maximum distance between two adjacent typesetting lines to be merged')
 
     # optimizations
     parser.add_argument('--no-fast-skip', action='store_false', dest='fast_skip',
