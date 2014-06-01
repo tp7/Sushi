@@ -16,8 +16,8 @@ import bisect
 ALLOWED_ERROR = 0.01
 MAX_GROUP_STD = 0.025
 MAX_REASONABLE_DIFF = 0.5
-MAX_FBF_DURATION = 1001.0 / 24000.0 * 1.5 # 1.5 frames at 23.976
-MAX_FBF_DISTANCE = 1001.0 / 24000.0 * 0.5 # 0.5 frames at 23.976
+MAX_FBF_DURATION = 1001.0 / 24000.0 * 2.5  # 2.5 frames at 23.976
+MAX_FBF_DISTANCE = 1001.0 / 24000.0 * 8.5  # 0.5 frames at 23.976
 
 
 def abs_diff(a, b):
@@ -125,37 +125,35 @@ def groups_from_chapters(events, times, min_auto_group_size):
 def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
     small_window = 2
     last_shift = 0
-    idx = 0
-    while idx < len(events):
-        event = events[idx]
-        if event.end == event.start:
+
+    for idx, event in enumerate(events):
+        if event.start > src_stream.duration_seconds:
+            logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
+            event.mark_broken()
+        elif event.end == event.start:
             logging.debug('{0}: skipped because zero duration'.format(format_time(event.start)))
             if idx == 0:
                 event.mark_broken()
             else:
-                event.copy_shift_from(events[idx - 1])
-            idx += 1
-            continue
-
-        if fast_skip:
+                event.link_to_event(events[idx-1])
+        elif fast_skip:
             # assuming scripts are sorted by start time so we don't search the entire collection
             same_start = lambda x: event.start == x.start
-            processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if x.end == event.end), None)
+            processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end), None)
             if processed:
                 # logging.debug('{0}-{1}: skipped because identical to already processed (typesetting?)'
                 #               .format(format_time(event.start), format_time(event.end)))
-                event.copy_shift_from(processed)
-                idx += 1
-                continue
+                event.link_to_event(processed)
 
-        if event.start > src_stream.duration_seconds:
-            logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
-            event.mark_broken()
-            idx += 1
-            continue
+    linked_events = [e for e in events if e.linked]
+    events = [e for e in events if not e.linked and not e.broken]
+
+    idx = 0
+    while idx < len(events):
+        event = events[idx]
 
         search_group = [event]
-        idx+=1
+        idx += 1
         if event.duration < MAX_FBF_DURATION:
             while idx < len(events) and events[idx].duration < MAX_FBF_DURATION and abs_diff(events[idx].start, search_group[-1].end) < MAX_FBF_DISTANCE:
                 search_group.append(events[idx])
@@ -186,7 +184,9 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
             logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
                           .format(format_time(e.start), format_time(e.end), time_offset, diff))
 
-
+    # todo: links should be resolved at the end of processing
+    for e in linked_events:
+        e.resolve_link()
 
 
 def clip_obviously_wrong(events):

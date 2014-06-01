@@ -16,6 +16,7 @@ class ScriptEventBase(object):
         self.diff = 1
         self.start = start
         self.end = end
+        self._linked_event = None
 
     def mark_broken(self):
         self.broken = True
@@ -37,6 +38,18 @@ class ScriptEventBase(object):
         self.broken = other.broken
         self.shift = other.shift
         self.diff = other.diff
+
+    def link_to_event(self, other):
+        self._linked_event = other
+
+    def resolve_link(self):
+        if not self.linked:
+            raise Exception('This is a bug')
+        self.copy_shift_from(self._linked_event)
+
+    @property
+    def linked(self):
+        return self._linked_event is not None
 
     def set_keyframes(self, prev_kf, next_kf):
         self.prev_kf = prev_kf
