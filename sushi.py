@@ -1,8 +1,8 @@
 import logging
-from common import SushiError, get_extension
+from common import SushiError, get_extension, format_time
 from demux import Timecodes, Demuxer
 from keyframes import parse_keyframes
-from subs import AssScript, SrtScript, TimeOffset
+from subs import AssScript, SrtScript
 from wav import WavStream
 import sys
 from itertools import takewhile
@@ -78,13 +78,13 @@ def detect_groups(events, min_group_size):
 
 def groups_from_chapters(events, times, min_auto_group_size):
     times = list(times)  # copy
-    logging.debug(u'Chapter start points: {0}'.format([TimeOffset.from_seconds(t) for t in times]))
+    logging.debug(u'Chapter start points: {0}'.format([format_time(t) for t in times]))
     times.append(36000000000)  # very large event at the end
     groups = [[]]
     current_chapter = 0
 
     for event in events:
-        if event.start.total_seconds > times[current_chapter + 1]:
+        if event.start > times[current_chapter + 1]:
             groups.append([])
             current_chapter += 1
 
@@ -99,14 +99,14 @@ def groups_from_chapters(events, times, min_auto_group_size):
         std = np.std([e.shift for e in g])
         if std > MAX_GROUP_STD:
             logging.warn(u'Shift is not consistent between {0} and {1}, most likely chapters are wrong (std: {2}). '
-                         u'Switching to automatic grouping.'.format(g[0].start, g[-1].end, std))
+                         u'Switching to automatic grouping.'.format(format_time(g[0].start), format_time(g[-1].end), std))
             correct_groups.extend(detect_groups(g, min_auto_group_size))
             broken_found = True
         else:
             correct_groups.append(g)
 
     if broken_found:
-        correct_groups = sorted(correct_groups, key=lambda g: g[0].start.total_seconds)
+        correct_groups = sorted(correct_groups, key=lambda g: g[0].start)
 
         i = 0
         while i < len(correct_groups) - 1:
@@ -125,7 +125,7 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
     last_shift = 0
     for idx, event in enumerate(events):
         if event.end == event.start:
-            logging.debug('{0}: skipped because zero duration'.format(event.start))
+            logging.debug('{0}: skipped because zero duration'.format(format_time(event.start)))
             if idx == 0:
                 event.mark_broken()
             else:
@@ -142,14 +142,14 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
             if shift_set:
                 continue
 
-        if event.start.total_seconds > src_stream.duration_seconds:
+        if event.start > src_stream.duration_seconds:
             logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
             event.mark_broken()
             continue
 
-        tv_audio = src_stream.get_substream(event.start.total_seconds, event.end.total_seconds)
+        tv_audio = src_stream.get_substream(event.start, event.end)
 
-        original_time = event.start.total_seconds
+        original_time = event.start
         start_point = original_time + last_shift
 
         # searching with smaller window
@@ -167,7 +167,7 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip):
 
         last_shift = time_offset = new_time - original_time
         event.set_shift(time_offset, diff)
-        logging.debug('{0}: shift: {1:0.12f}, diff: {2:0.12f}'.format(event.start, time_offset, diff))
+        logging.debug('{0}: shift: {1:0.12f}, diff: {2:0.12f}'.format(format_time(event.start), time_offset, diff))
 
 
 def clip_obviously_wrong(events):
@@ -208,8 +208,8 @@ def find_keyframes_nearby(events, keyframes):
         return after if after - timestamp < timestamp - before else before
 
     for event in events:
-        before = find_closest_kf(event.start.total_seconds + event.shift)
-        after = find_closest_kf(event.end.total_seconds + event.shift)
+        before = find_closest_kf(event.start + event.shift)
+        after = find_closest_kf(event.end + event.shift)
         event.set_keyframes(before, after)
 
 
@@ -218,7 +218,7 @@ def snap_to_keyframes(events, timecodes, max_kf_distance, max_kf_snapping):
     distances = []
     frame_sizes = []
     for event in events:
-        frame_sizes.append(timecodes.get_frame_size(event.start.total_seconds))
+        frame_sizes.append(timecodes.get_frame_size(event.start))
         for d in event.get_keyframes_distances():
             if d is not None and abs(d) < (max_kf_distance * frame_sizes[-1]):
                 distances.append(d)
@@ -384,7 +384,7 @@ def run(args):
                 avg_shift = average_shifts(g)
                 logging.info(u'Group (start: {0}, end: {1}, lines: {2}), '
                              u'shifts (start: {3}, end: {4}, average: {5})'
-                             .format(g[0].start, g[-1].end, len(g), start_shift, end_shift, avg_shift))
+                             .format(format_time(g[0].start), format_time(g[-1].end), len(g), start_shift, end_shift, avg_shift))
                 if keyframes:
                     find_keyframes_nearby(g, keytimes)
                     snap_to_keyframes(g, timecodes, args.max_kf_distance, args.max_kf_snapping)

@@ -1,59 +1,12 @@
 import logging
 import codecs
 import os
-from common import SushiError
+from common import SushiError, format_time
 
 
-class TimeOffset(object):
-    __slots__ = ['seconds']
-
-    def __init__(self, seconds=None):
-        super(TimeOffset, self).__init__()
-        self.seconds = seconds
-
-    @staticmethod
-    def from_seconds(seconds):
-        return TimeOffset(seconds=seconds)
-
-    @staticmethod
-    def from_ass_string(string):
-        hours, minutes, seconds = map(float, string.split(':'))
-        return TimeOffset(hours*3600+minutes*60+seconds)
-
-    @staticmethod
-    def from_srt_string(string):
-        return TimeOffset.from_ass_string(string.replace(',','.'))
-
-    def add_seconds(self, offset):
-        self.seconds = max(0, self.seconds + offset)
-
-    @property
-    def total_seconds(self):
-        return self.seconds
-
-    def to_ass_time_string(self):
-        return u'{0}:{1:02d}:{2:02d}.{3:02d}'.format(
-            int(self.seconds // 3600),
-            int((self.seconds // 60) % 60),
-            int(self.seconds % 60),
-            int(round((self.seconds % 1) * 100)))
-
-    def to_srt_time_string(self):
-        return u'{0:02d}:{1:02d}:{2:02d},{3:03d}'.format(
-            int(self.seconds // 3600),
-            int((self.seconds // 60) % 60),
-            int(self.seconds % 60),
-            int(round((self.seconds % 1) * 1000)))
-
-    def __unicode__(self):
-        return self.to_ass_time_string()
-
-    def __repr__(self):
-        return self.to_ass_time_string()
-
-    def __eq__(self, other):
-        return self.seconds == other.seconds
-
+def _parse_ass_time(string):
+    hours, minutes, seconds = map(float, string.split(':'))
+    return hours*3600+minutes*60+seconds
 
 class ScriptEventBase(object):
     def __init__(self, start, end):
@@ -67,13 +20,13 @@ class ScriptEventBase(object):
     def mark_broken(self):
         self.broken = True
 
-    def shift_by_seconds(self, seconds):
-        self.start.add_seconds(seconds)
-        self.end.add_seconds(seconds)
+    def duration(self):
+        return self.end - self.start
 
     def apply_shift(self):
         if self.shift:
-            self.shift_by_seconds(self.shift)
+            self.start += self.shift
+            self.end += self.shift
 
     def set_shift(self, shift, audio_diff):
         self.shift = shift
@@ -89,8 +42,8 @@ class ScriptEventBase(object):
         self.next_kf = next_kf
 
     def get_keyframes_distances(self):
-        p = None if self.prev_kf is None else self.prev_kf - (self.start.total_seconds + self.shift)
-        n = None if self.next_kf is None else self.next_kf - (self.end.total_seconds + self.shift)
+        p = None if self.prev_kf is None else self.prev_kf - (self.start + self.shift)
+        n = None if self.next_kf is None else self.next_kf - (self.end + self.shift)
         return (p,n)
 
     def adjust_shift(self, value):
@@ -101,23 +54,35 @@ class ScriptBase(object):
         self.events = sorted(self.events, key=lambda x: x.broken)
 
     def sort_by_time(self):
-        self.events = sorted(self.events, key=lambda x: x.start.total_seconds)
+        self.events = sorted(self.events, key=lambda x: x.start)
 
 
 class SrtEvent(ScriptEventBase):
     def __init__(self, text):
         lines = text.split('\n', 2)
         times = lines[1].split('-->')
-        start = TimeOffset.from_srt_string(times[0].rstrip())
-        end = TimeOffset.from_srt_string(times[1].lstrip())
+        start =  self._parse_srt_time(times[0].rstrip())
+        end = self._parse_srt_time(times[1].lstrip())
 
         super(SrtEvent, self).__init__(start, end)
         self.idx = int(lines[0])
         self.text = lines[2]
 
+    @staticmethod
+    def _parse_srt_time(string):
+        return _parse_ass_time(string.replace(',','.'))
+
     def __unicode__(self):
-        return u'{0}\n{1} --> {2}\n{3}'.format(self.idx, self.start.to_srt_time_string(),
-                                               self.end.to_srt_time_string(), self.text)
+        return u'{0}\n{1} --> {2}\n{3}'.format(self.idx, self._format_time(self.start),
+                                               self._format_time(self.end), self.text)
+
+    @staticmethod
+    def _format_time(seconds):
+        return u'{0:02d}:{1:02d}:{2:02d},{3:03d}'.format(
+            int(seconds // 3600),
+            int((seconds // 60) % 60),
+            int(seconds % 60),
+            int(round((seconds % 1) * 1000)))
 
 
 class SrtScript(ScriptBase):
@@ -141,8 +106,8 @@ class AssEvent(ScriptEventBase):
         self.kind = split[0]
         split = [x.strip() for x in split[1].split(',', 9)]
 
-        start = TimeOffset.from_ass_string(split[1])
-        end = TimeOffset.from_ass_string(split[2])
+        start = _parse_ass_time(split[1])
+        end = _parse_ass_time(split[2])
 
         super(AssEvent, self).__init__(start, end)
 
@@ -157,12 +122,16 @@ class AssEvent(ScriptEventBase):
 
     def __unicode__(self):
         return u'{0}: {1},{2},{3},{4},{5},{6},{7},{8},{9},{10}'.format(self.kind, self.layer,
-                                                                       self.start.to_ass_time_string(),
-                                                                       self.end.to_ass_time_string(),
+                                                                       self._format_time(self.start),
+                                                                       self._format_time(self.end),
                                                                        self.style, self.name,
                                                                        self.margin_left, self.margin_right,
                                                                        self.margin_vertical, self.effect,
                                                                        self.text)
+
+    @staticmethod
+    def _format_time(seconds):
+        return format_time(seconds)
 
     def __repr__(self):
         return unicode(self)
