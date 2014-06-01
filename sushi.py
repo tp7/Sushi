@@ -144,20 +144,25 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip, max_ts_d
                 #               .format(format_time(event.start), format_time(event.end)))
                 event.link_event(processed)
 
-    linked_events = [e for e in events if e.linked]
-    events = [e for e in events if not e.linked and not e.broken]
+    events = (e for e in events if not e.linked and not e.broken)
 
-    idx = 0
-    while idx < len(events):
-        event = events[idx]
+    search_groups = []
+    event = next(events, None)
+    while event:
+        if event.duration > max_ts_duration:
+            search_groups.append([event])
+            event = next(events, None)
+        else:
+            group = [event]
+            event = next(events, None)
+            while event and event.duration < max_ts_duration and abs(event.start - group[-1].end) < max_ts_distance:
+                group.append(event)
+                event = next(events, None)
 
-        search_group = [event]
-        idx += 1
-        if event.duration < max_ts_duration:
-            while idx < len(events) and events[idx].duration < max_ts_duration and abs(events[idx].start - search_group[-1].end) < max_ts_distance:
-                search_group.append(events[idx])
-                idx += 1
+            search_groups.append(group)
 
+
+    for search_group in search_groups:
         tv_audio = src_stream.get_substream(search_group[0].start, search_group[-1].end)
 
         original_time = search_group[0].start
