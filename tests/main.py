@@ -1,7 +1,7 @@
-from collections import namedtuple
 import os
 import re
 import unittest
+from mock import patch, ANY
 from common import SushiError
 from sushi import parse_args_and_run, detect_groups
 
@@ -10,56 +10,36 @@ here = os.path.dirname(os.path.abspath(__file__))
 def media(name):
     return here + '/media/' + name
 
-
+@patch('sushi.check_file_exists')
 class MainScriptTestCase(unittest.TestCase):
-    @staticmethod
-    def get_nichibros():
-        return ['--src', media('nichibros.m4a'),
-                '--dst', media('nichibros-shifted.m4a'),
-                '--script', media('nichibros.ass')]
-
     @staticmethod
     def any_case_regex(text):
         return re.compile(text, flags=re.IGNORECASE)
 
-    def test_raises_on_source_not_existing(self):
-        keys = ['--src', 'this_totally_does_not_exist_nKWDBN8rUw65QxcCxVnpcMwH5gFy65', '--dst', media('nichibros-shifted.m4a')]
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'source.*exist'), lambda: parse_args_and_run(keys))
+    def test_checks_that_files_exist(self, mock_object):
+        keys = ['--dst', 'dst', '--src', 'src', '--script', 'script', '--chapters', 'chapters',
+                '--keyframes', 'keyframes', '--timecodes', 'tcs']
+        try:
+            parse_args_and_run(keys)
+        except SushiError:
+            pass
+        mock_object.assert_any_call('src', ANY)
+        mock_object.assert_any_call('dst', ANY)
+        mock_object.assert_any_call('script', ANY)
+        mock_object.assert_any_call('chapters', ANY)
+        mock_object.assert_any_call('keyframes', ANY)
+        mock_object.assert_any_call('tcs', ANY)
 
-    def test_raises_on_destination_not_existing(self):
-        keys = ['--dst', 'this_totally_does_not_exist_nKWDBN8rUw65QxcCxVnpcMwH5gFy65', '--src', media('nichibros.m4a')]
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'dest.*exist'), lambda: parse_args_and_run(keys))
-
-    def test_raises_on_script_not_existing(self):
-        keys = ['--src', media('nichibros.m4a'), '--dst', media('nichibros-shifted.m4a'), '--script', media('nKWDBN8rUw65QxcCxVnpcMwH5gFy65')]
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*exist'), lambda: parse_args_and_run(keys))
-
-    def test_raises_on_unknown_script_type(self):
-        keys = ['--src', media('nichibros.m4a'), '--dst', media('nichibros-shifted.m4a'), '--script', media('nichibros.m4a')]
+    def test_raises_on_unknown_script_type(self, ignore):
+        keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.mp4']
         self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*type'), lambda: parse_args_and_run(keys))
 
-    def test_raises_on_script_type_not_matching(self):
-        keys = ['--src', media('nichibros.m4a'), '--dst', media('nichibros-shifted.m4a'), '--script', media('nichibros.ass'), '-o', 'nichibros.srt']
+    def test_raises_on_script_type_not_matching(self, ignore):
+        keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.ass', '-o', 'd.srt']
         self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*type.*match'), lambda: parse_args_and_run(keys))
 
-    def test_raises_on_keyframes_not_existing(self):
-        keys = self.get_nichibros()
-        keys.extend(['--keyframes', 'this_totally_does_not_exist_nKWDBN8rUw65QxcCxVnpcMwH5gFy65'])
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'keyframes.*exist'), lambda: parse_args_and_run(keys))
-
-    def test_raises_on_chapters_not_existing(self):
-        keys = self.get_nichibros()
-        keys.extend(['--chapters', 'this_totally_does_not_exist_nKWDBN8rUw65QxcCxVnpcMwH5gFy65'])
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'chapters.*exist'), lambda: parse_args_and_run(keys))
-
-    def test_raises_on_timecodes_not_existing(self):
-        keys = self.get_nichibros()
-        keys.extend(['--timecodes', 'this_totally_does_not_exist_nKWDBN8rUw65QxcCxVnpcMwH5gFy65'])
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'timecode'), lambda: parse_args_and_run(keys))
-
-    def test_raises_on_timecodes_and_fps_being_defined_together(self):
-        keys = self.get_nichibros()
-        keys.extend(['--timecodes',  media('nichibros.tc.txt'), '--fps', '23.976'])
+    def test_raises_on_timecodes_and_fps_being_defined_together(self, ignore):
+        keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.ass', '--timecodes', 'tc.txt', '--fps', '25']
         self.assertRaisesRegexp(SushiError, self.any_case_regex(r'timecodes'), lambda: parse_args_and_run(keys))
 
 
