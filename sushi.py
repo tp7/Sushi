@@ -121,7 +121,7 @@ def groups_from_chapters(events, times, min_auto_group_size):
     return correct_groups
 
 
-def calculate_shifts(src_stream, dst_stream, events, window, fast_skip, max_ts_duration, max_ts_distance):
+def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast_skip, max_ts_duration, max_ts_distance):
     small_window = 2
     last_shift = 0
 
@@ -147,20 +147,25 @@ def calculate_shifts(src_stream, dst_stream, events, window, fast_skip, max_ts_d
     events = (e for e in events if not e.linked and not e.broken)
 
     search_groups = []
+    chapter_times = iter(chapter_times[1:] + [100000000])
+    next_chapter = next(chapter_times)
     event = next(events, None)
     while event:
+        while event.end > next_chapter:
+            next_chapter = next(chapter_times)
+
         if event.duration > max_ts_duration:
             search_groups.append([event])
             event = next(events, None)
         else:
             group = [event]
             event = next(events, None)
-            while event and event.duration < max_ts_duration and abs(event.start - group[-1].end) < max_ts_distance:
+            while event and event.duration < max_ts_duration and abs(event.start - group[-1].end) < max_ts_distance\
+                    and event.end <= next_chapter:
                 group.append(event)
                 event = next(events, None)
 
             search_groups.append(group)
-
 
     for search_group in search_groups:
         tv_audio = src_stream.get_substream(search_group[0].start, search_group[-1].end)
@@ -386,6 +391,7 @@ def run(args):
         dst_stream = WavStream(dst_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
 
         calculate_shifts(src_stream, dst_stream, script.events,
+                         chapter_times=chapter_times,
                          window=args.window,
                          fast_skip=args.fast_skip,
                          max_ts_duration=args.max_ts_duration,
