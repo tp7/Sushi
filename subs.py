@@ -73,9 +73,6 @@ class ScriptEventBase(object):
         self._shift += value
 
 class ScriptBase(object):
-    def sort_broken(self):
-        self.events = sorted(self.events, key=lambda x: x.broken)
-
     def sort_by_time(self):
         self.events = sorted(self.events, key=lambda x: x.start)
 

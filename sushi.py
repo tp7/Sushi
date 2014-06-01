@@ -386,7 +386,6 @@ def run(args):
                          max_ts_duration=args.max_ts_duration,
                          max_ts_distance=args.max_ts_distance)
 
-        script.sort_broken()  # avoid processing broken lines with zero shifts
         events = [x for x in script.events if not x.broken]
 
         fix_near_borders(events)
