@@ -35,7 +35,7 @@ def smooth_events(events, window_size):
 
 
 def detect_groups(events, min_group_size):
-    smooth_events(events, 7)  # smoothing events for better group detection
+    smooth_events([x for x in events if not x.linked], 7)  # smoothing events for better group detection
 
     last_shift = events[0].shift
     current_group = []
@@ -247,11 +247,12 @@ def snap_to_keyframes(events, timecodes, max_kf_distance, max_kf_snapping):
                   .format('Snapping' if snap else 'Not snapping', mean, mean_fs))
 
     if snap:
-        for event in events:
+        for event in filter(lambda x: not x.linked, events):
             event.adjust_shift(mean)
 
 
 def average_shifts(events):
+    events = [e for e in events if not e.linked]
     shifts = [x.shift for x in events]
     weights = [1 - x.diff for x in events]
     avg, weights_sum = np.average(shifts, weights=weights, returned=True)

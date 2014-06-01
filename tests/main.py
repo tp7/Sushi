@@ -47,6 +47,11 @@ class GroupSplittingTestCase(unittest.TestCase):
     class FakeEvent(object):
         def __init__(self, shift):
             self.shift = shift
+            self.linked = False
+            self.diff = 0
+
+        def set_shift(self, shift, diff):
+            self.shift = shift
 
         def __repr__(self):
             return repr(self.shift)

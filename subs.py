@@ -38,6 +38,8 @@ class ScriptEventBase(object):
         self.end += self.shift
 
     def set_shift(self, shift, audio_diff):
+        if self.linked:
+            self._resolve_link()
         self._shift = shift
         self._diff = audio_diff
 
@@ -67,7 +69,7 @@ class ScriptEventBase(object):
 
     def adjust_shift(self, value):
         if self.linked:
-            self._resolve_link()
+            raise Exception('Cannot adjust time of linked events. This is a bug')
         self._shift += value
 
 class ScriptBase(object):
