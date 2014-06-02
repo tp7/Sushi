@@ -21,6 +21,31 @@ MAX_REASONABLE_DIFF = 0.5
 def abs_diff(a, b):
     return abs(a - b)
 
+def write_shift_avs(output_path, groups, src_audio, dst_audio):
+    from collections import namedtuple
+    Group = namedtuple('ShiftGroup', ['start', 'shift'])
+
+    def format_trim(start, end, shift):
+        return 'tv.trim({0},{1}).DelayAudio({2})'.format(start, end, shift)
+    duration = int(groups[-1][-1].end * 24000.0 / 1001.0) + 100
+    text = 'bd = Blackness({0}, 1920, 1080, "YV24").AudioDub(FFAudioSource("{1}")).WaveForm(zoom=1,height=1080).grayscale()\n'\
+            'bd = bd.mt_merge(blackness({0}, 1920, 1080, color=$00800000).converttoyv24(), bd,luma=true)\n\n'.format(duration, os.path.abspath(dst_audio))
+
+    text += 'tv = Blackness({0}, 1920, 1080, "YV24").AudioDub(FFAudioSource("{1}"))\n\n'.format(duration, os.path.abspath(src_audio))
+    text += 'tv = '
+    groups = [Group(int(round(x[0].start * 24000.0/1001.0)), x[0].shift) for x in groups]
+
+    text += format_trim(0, groups[1].start-1, groups[0].shift) + ' ++\\\n\t\t'
+
+    for idx in xrange(1, len(groups)-1):
+        text += format_trim(groups[idx].start, groups[idx+1].start-1, groups[idx].shift) + ' ++\\\n\t\t'
+
+    text += format_trim(groups[-1].start, 0, groups[-1].shift) + '\n'
+    text += 'tv = tv.WaveForm(zoom=1,height=1080).grayscale()\n\n' \
+            'mt_logic(tv, bd, "max", u=3,v=3)\n'.format(duration)
+    with open(output_path, 'w') as file:
+        file.write(text)
+
 
 # todo: implement this as a running median
 def smooth_events(events, window_size):
@@ -427,6 +452,8 @@ def run(args):
                 if keyframes:
                     find_keyframes_nearby(g, keytimes)
                     snap_to_keyframes(g, timecodes, args.max_kf_distance, args.max_kf_snapping)
+            if args.write_avs:
+                write_shift_avs(dst_script_path + '.avs', groups, src_audio_path, dst_audio_path)
         elif keyframes:
             find_keyframes_nearby(events, keytimes)
             snap_to_keyframes(events, timecodes, args.max_kf_distance, args.max_kf_snapping)
@@ -461,6 +488,8 @@ def create_arg_parser():
     # 5 frames at 23.976
     parser.add_argument('--max-ts-distance', default=1001.0 / 24000.0 * 5, type=float, metavar='<seconds>', dest='max_ts_distance',
                         help='Maximum distance between two adjacent typesetting lines to be merged')
+
+    parser.add_argument('--test-write-avs', action='store_true', dest='write_avs')
 
     # optimizations
     parser.add_argument('--no-fast-skip', action='store_false', dest='fast_skip',
