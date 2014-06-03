@@ -5,7 +5,7 @@ from keyframes import parse_keyframes
 from subs import AssScript, SrtScript
 from wav import WavStream
 import sys
-from itertools import takewhile
+from itertools import takewhile, groupby
 import numpy as np
 import argparse
 import chapters
@@ -21,24 +21,30 @@ MAX_REASONABLE_DIFF = 0.5
 def abs_diff(a, b):
     return abs(a - b)
 
+
 def write_shift_avs(output_path, groups, src_audio, dst_audio):
     from collections import namedtuple
+
     Group = namedtuple('ShiftGroup', ['start', 'shift'])
 
     def format_trim(start, end, shift):
         return 'tv.trim({0},{1}).DelayAudio({2})'.format(start, end, shift)
+
     duration = int(groups[-1][-1].end * 24000.0 / 1001.0) + 100
-    text = 'bd = Blackness({0}, 1920, 1080, "YV24").AudioDub(FFAudioSource("{1}")).WaveForm(zoom=1,height=1080).grayscale()\n'\
-            'bd = bd.mt_merge(blackness({0}, 1920, 1080, color=$00800000).converttoyv24(), bd,luma=true)\n\n'.format(duration, os.path.abspath(dst_audio))
+    text = 'bd = Blackness({0}, 1920, 1080, "YV24").AudioDub(FFAudioSource("{1}")).WaveForm(zoom=1,height=1080).grayscale()\n' \
+           'bd = bd.mt_merge(blackness({0}, 1920, 1080, color=$00800000).converttoyv24(), bd,luma=true)\n\n'.format(
+        duration, os.path.abspath(dst_audio))
 
-    text += 'tv = Blackness({0}, 1920, 1080, "YV24").AudioDub(FFAudioSource("{1}"))\n\n'.format(duration, os.path.abspath(src_audio))
+    text += 'tv = Blackness({0}, 1920, 1080, "YV24").AudioDub(FFAudioSource("{1}"))\n\n'.format(duration,
+                                                                                                os.path.abspath(
+                                                                                                    src_audio))
     text += 'tv = '
-    groups = [Group(int(round(x[0].start * 24000.0/1001.0)), x[0].shift) for x in groups]
+    groups = [Group(int(round(x[0].start * 24000.0 / 1001.0)), x[0].shift) for x in groups]
 
-    text += format_trim(0, groups[1].start-1, groups[0].shift) + ' ++\\\n\t\t'
+    text += format_trim(0, groups[1].start - 1, groups[0].shift) + ' ++\\\n\t\t'
 
-    for idx in xrange(1, len(groups)-1):
-        text += format_trim(groups[idx].start, groups[idx+1].start-1, groups[idx].shift) + ' ++\\\n\t\t'
+    for idx in xrange(1, len(groups) - 1):
+        text += format_trim(groups[idx].start, groups[idx + 1].start - 1, groups[idx].shift) + ' ++\\\n\t\t'
 
     text += format_trim(groups[-1].start, 0, groups[-1].shift) + '\n'
     text += 'tv = tv.WaveForm(zoom=1,height=1080).grayscale()\n\n' \
@@ -124,7 +130,8 @@ def groups_from_chapters(events, times, min_auto_group_size):
         std = np.std([e.shift for e in g])
         if std > MAX_GROUP_STD:
             logging.warn(u'Shift is not consistent between {0} and {1}, most likely chapters are wrong (std: {2}). '
-                         u'Switching to automatic grouping.'.format(format_time(g[0].start), format_time(g[-1].end), std))
+                         u'Switching to automatic grouping.'.format(format_time(g[0].start), format_time(g[-1].end),
+                                                                    std))
             correct_groups.extend(detect_groups(g, min_auto_group_size))
             broken_found = True
         else:
@@ -143,90 +150,6 @@ def groups_from_chapters(events, times, min_auto_group_size):
                 i += 1
 
     return correct_groups
-
-
-def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast_skip, max_ts_duration, max_ts_distance):
-    small_window = 2
-    last_shift = 0
-
-    for idx, event in enumerate(events):
-        if event.start > src_stream.duration_seconds:
-            logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
-            event.mark_broken()
-        elif event.end == event.start:
-            logging.debug('{0}: skipped because zero duration'.format(format_time(event.start)))
-            if idx == 0:
-                event.mark_broken()
-            else:
-                event.link_event(events[idx-1])
-        elif fast_skip:
-            # assuming scripts are sorted by start time so we don't search the entire collection
-            same_start = lambda x: event.start == x.start
-            try:
-                processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end), None)
-                event.link_event(processed)
-                # logging.debug('{0}-{1}: skipped because identical to already processed (typesetting?)'
-                #               .format(format_time(event.start), format_time(event.end)))
-            except StopIteration:
-                pass
-
-    events = (e for e in events if not e.linked and not e.broken)
-
-    search_groups = []
-    chapter_times = iter(chapter_times[1:] + [100000000])
-    next_chapter = next(chapter_times)
-    event = next(events, None)
-    while event:
-        while event.end > next_chapter:
-            next_chapter = next(chapter_times)
-
-        if event.duration > max_ts_duration:
-            search_groups.append([event])
-            event = next(events, None)
-        else:
-            group = [event]
-            event = next(events, None)
-            while event and event.duration < max_ts_duration and abs(event.start - group[-1].end) < max_ts_distance\
-                    and event.end <= next_chapter:
-                group.append(event)
-                event = next(events, None)
-
-            search_groups.append(group)
-
-    passed_groups = []
-    for idx, group in enumerate(search_groups):
-        try:
-            other = next(x for x in reversed(search_groups[:idx]) if x[0].start <= group[0].start and x[-1].end >= group[-1].end)
-            for event in group:
-                event.link_event(other[0])
-        except StopIteration:
-            passed_groups.append(group)
-
-    for search_group in passed_groups:
-        tv_audio = src_stream.get_substream(search_group[0].start, search_group[-1].end)
-
-        original_time = search_group[0].start
-        start_point = original_time + last_shift
-
-        # searching with smaller window
-        diff = new_time = None
-        if small_window < window:
-            diff, new_time = dst_stream.find_substream(tv_audio,
-                                                       start_time=start_point - small_window,
-                                                       end_time=start_point + small_window)
-
-        # checking if times are close enough to last shift - no point in re-searching with full window if it's in the same group
-        if not new_time or abs_diff(new_time - original_time, last_shift) > ALLOWED_ERROR:
-            diff, new_time = dst_stream.find_substream(tv_audio,
-                                                       start_time=start_point - window,
-                                                       end_time=start_point + window)
-
-        last_shift = time_offset = new_time - original_time
-
-        for e in search_group:
-            e.set_shift(time_offset, diff)
-            logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
-                          .format(format_time(e.start), format_time(e.end), time_offset, diff))
 
 
 def clip_obviously_wrong(events):
@@ -289,7 +212,7 @@ def snap_to_keyframes(events, timecodes, max_kf_distance, max_kf_snapping):
     mean = np.mean(distances)
     snap = abs(mean) < (max_kf_snapping * mean_fs)
     logging.info('{0} to keyframes [distance: {1}, frame size: {2}]'
-                  .format('Snapping' if snap else 'Not snapping', mean, mean_fs))
+                 .format('Snapping' if snap else 'Not snapping', mean, mean_fs))
 
     if snap:
         for event in filter(lambda x: not x.linked, events):
@@ -304,6 +227,94 @@ def average_shifts(events):
     for e in events:
         e.set_shift(avg, e.diff)
     return avg
+
+
+def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast_skip, max_ts_duration,
+                     max_ts_distance):
+    small_window = 2
+    last_shift = 0
+
+    for idx, event in enumerate(events):
+        if event.start > src_stream.duration_seconds:
+            logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
+            event.mark_broken()
+        elif event.end == event.start:
+            logging.debug('{0}: skipped because zero duration'.format(format_time(event.start)))
+            if idx == 0:
+                event.mark_broken()
+            else:
+                event.link_event(events[idx - 1])
+        elif fast_skip:
+            # assuming scripts are sorted by start time so we don't search the entire collection
+            same_start = lambda x: event.start == x.start
+            try:
+                processed = next(
+                    (x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end),
+                    None)
+                event.link_event(processed)
+                # logging.debug('{0}-{1}: skipped because identical to already processed (typesetting?)'
+                # .format(format_time(event.start), format_time(event.end)))
+            except StopIteration:
+                pass
+
+    events = (e for e in events if not e.linked and not e.broken)
+
+    search_groups = []
+    chapter_times = iter(chapter_times[1:] + [100000000])
+    next_chapter = next(chapter_times)
+    event = next(events, None)
+    while event:
+        while event.end > next_chapter:
+            next_chapter = next(chapter_times)
+
+        if event.duration > max_ts_duration:
+            search_groups.append([event])
+            event = next(events, None)
+        else:
+            group = [event]
+            event = next(events, None)
+            while event and event.duration < max_ts_duration and abs(event.start - group[-1].end) < max_ts_distance \
+                    and event.end <= next_chapter:
+                group.append(event)
+                event = next(events, None)
+
+            search_groups.append(group)
+
+    passed_groups = []
+    for idx, group in enumerate(search_groups):
+        try:
+            other = next(
+                x for x in reversed(search_groups[:idx]) if x[0].start <= group[0].start and x[-1].end >= group[-1].end)
+            for event in group:
+                event.link_event(other[0])
+        except StopIteration:
+            passed_groups.append(group)
+
+    for search_group in passed_groups:
+        tv_audio = src_stream.get_substream(search_group[0].start, search_group[-1].end)
+
+        original_time = search_group[0].start
+        start_point = original_time + last_shift
+
+        # searching with smaller window
+        diff = new_time = None
+        if small_window < window:
+            diff, new_time = dst_stream.find_substream(tv_audio,
+                                                       start_time=start_point - small_window,
+                                                       end_time=start_point + small_window)
+
+        # checking if times are close enough to last shift - no point in re-searching with full window if it's in the same group
+        if not new_time or abs_diff(new_time - original_time, last_shift) > ALLOWED_ERROR:
+            diff, new_time = dst_stream.find_substream(tv_audio,
+                                                       start_time=start_point - window,
+                                                       end_time=start_point + window)
+
+        last_shift = time_offset = new_time - original_time
+
+        for e in search_group:
+            e.set_shift(time_offset, diff)
+            logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
+                          .format(format_time(e.start), format_time(e.end), time_offset, diff))
 
 
 def apply_shifts(events):
@@ -440,7 +451,7 @@ def run(args):
         events = [x for x in script.events if not x.broken]
 
         fix_near_borders(events)
-        clip_obviously_wrong(events)
+        # clip_obviously_wrong(events)
 
         if args.grouping:
             if not ignore_chapters and chapter_times:
@@ -454,14 +465,15 @@ def run(args):
                 avg_shift = average_shifts(g)
                 logging.info(u'Group (start: {0}, end: {1}, lines: {2}), '
                              u'shifts (start: {3}, end: {4}, average: {5})'
-                             .format(format_time(g[0].start), format_time(g[-1].end), len(g), start_shift, end_shift, avg_shift))
+                             .format(format_time(g[0].start), format_time(g[-1].end), len(g), start_shift, end_shift,
+                                     avg_shift))
                 # if src_keyframes:
-                #     find_keyframes_nearby(g, src_keytimes, dst_keytimes)
+                # find_keyframes_nearby(g, src_keytimes, dst_keytimes)
                 #     snap_to_keyframes(g, timecodes, args.max_kf_distance, args.max_kf_snapping)
             if args.write_avs:
                 write_shift_avs(dst_script_path + '.avs', groups, src_audio_path, dst_audio_path)
         # elif src_keyframes:
-        #     find_keyframes_nearby(events, src_keytimes, dst_keytimes)
+        # find_keyframes_nearby(events, src_keytimes, dst_keytimes)
         #     snap_to_keyframes(events, timecodes, args.max_kf_distance, args.max_kf_snapping)
 
         apply_shifts(events)
@@ -488,11 +500,13 @@ def create_arg_parser():
     parser.add_argument('--max-kf-snapping', default=0.75, type=float, metavar='<frames>', dest='max_kf_snapping',
                         help='Maximum keyframe snapping distance [0.75]')
 
-     # 2.5 frames at 23.976
-    parser.add_argument('--max-ts-duration', default=1001.0 / 24000.0 * 2.5, type=float, metavar='<seconds>', dest='max_ts_duration',
+    # 2.5 frames at 23.976
+    parser.add_argument('--max-ts-duration', default=1001.0 / 24000.0 * 2.5, type=float, metavar='<seconds>',
+                        dest='max_ts_duration',
                         help='Maximum duration of a line to be considered typesetting')
     # 5 frames at 23.976
-    parser.add_argument('--max-ts-distance', default=1001.0 / 24000.0 * 5, type=float, metavar='<seconds>', dest='max_ts_distance',
+    parser.add_argument('--max-ts-distance', default=1001.0 / 24000.0 * 5, type=float, metavar='<seconds>',
+                        dest='max_ts_distance',
                         help='Maximum distance between two adjacent typesetting lines to be merged')
 
     parser.add_argument('--test-write-avs', action='store_true', dest='write_avs')
