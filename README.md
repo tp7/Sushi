@@ -20,8 +20,6 @@ Also, the script won't attempt to search for a line if a line with identical sta
 
 Then, the script will try to split all lines into groups. It can either try to build these groups automatically (lines with similar shift are grouped), or get them from chapters (XML or OGM), provided with `--chapters` argument. This is done because it is very unlikely for every line to have its own shift (unless there's some frame rate problems). Shift values of all events in every group are used to calculate weighted average (where weight is the coefficient of similarity of audio streams, calculated before). Of course you can disable grouping with `--no-grouping` switch.
 
-If keyframes are available, sushi will try to correct the shift time for better scenetiming. You can provide *keyframes of the output file* file using the `--keyframes` arguments. Right now only XviD 2pass stat file format is supported. The script also needs to know destination file fps, which can be specified using the `--fps` or `--timecodes` arguments, or extracted from a video file automatically. Using these values, sushi will first find the closest keyframes before and after every line of the group. Then it will calculate the mean distance of every line to the corresponding keyframes, ignoring any distance greater than 3 frames. If this mean distance is lower than 3/4 of a frame, it will be added to the group shift. Since the shift correction is never greater than a frame, this feature should be relatively safe to use all the time.
-
 Finally, sushi applies calculated shift to every line and writes the output file.
 
 ### Usage
@@ -49,8 +47,6 @@ By default sushi will try to extract audio, subtitles and chapters from the sour
 python sushi.py --src hdtv.mkv --dst bluray.mkv --script external.srt
 ```
 If there is some chapters in the provided file but for some reason you don't want to use any chapters at all, you can use write `--chapters none` to disable them. Automatic grouping will be used instead (unless disabled).
-
-When keyframes snapping is used and neither `--fps` nor `--chapters` files are provided, sushi will try to dump timecodes from the destination video file. Mkvextract will be used for this task when available, otherwise the script will fall back to ffmpeg. Do note that timecodes extraction with ffmpeg is ridiculously slow so you really want to have mkvextract available.
 
 After the job is done, sushi will delete all demuxed streams. To avoid this, you can use the `--no-cleanup` switch.
 

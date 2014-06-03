@@ -255,8 +255,8 @@ def fix_near_borders(events):
     fix_border(list(reversed(events)))
 
 
-def find_keyframes_nearby(events, keyframes):
-    def find_closest_kf(timestamp):
+def find_keyframes_nearby(events, src_keyframes, dst_keyframes):
+    def find_closest_kf(timestamp, keyframes):
         idx = bisect.bisect_left(keyframes, timestamp)
         if idx == 0:
             return keyframes[0]
@@ -267,8 +267,8 @@ def find_keyframes_nearby(events, keyframes):
         return after if after - timestamp < timestamp - before else before
 
     for event in events:
-        before = find_closest_kf(event.start + event.shift)
-        after = find_closest_kf(event.end + event.shift)
+        before = find_closest_kf(event.start + event.shift, dst_keyframes)
+        after = find_closest_kf(event.end + event.shift, dst_keyframes)
         event.set_keyframes(before, after)
 
 
@@ -325,7 +325,8 @@ def run(args):
     check_file_exists(args.source, 'Source')
     check_file_exists(args.destination, 'Destination')
     check_file_exists(args.timecodes_file, 'Timecodes')
-    check_file_exists(args.keyframes_file, 'Keyframes')
+    check_file_exists(args.src_keyframes, 'Source keyframes')
+    check_file_exists(args.dst_keyframes, 'Destination keyframes')
     check_file_exists(args.script_file, 'Script')
 
     if not ignore_chapters:
@@ -391,10 +392,13 @@ def run(args):
         chapter_times = []
 
     # selecting keyframes and timecodes
-    if args.keyframes_file:
-        keyframes = parse_keyframes(args.keyframes_file)
-        if not keyframes:
-            raise SushiError('No keyframes found in the provided keyframes file')
+    if args.src_keyframes:
+        src_keyframes = parse_keyframes(args.src_keyframes)
+        if not src_keyframes:
+            raise SushiError('No keyframes found in {0}'.format(args.src_keyframes))
+        dst_keyframes = parse_keyframes(args.dst_keyframes)
+        if not dst_keyframes:
+            raise SushiError('No keyframes found in {0}'.format(args.dst_keyframes))
 
         if args.timecodes_file:
             timecodes_file = args.timecodes_file
@@ -406,7 +410,8 @@ def run(args):
         else:
             raise SushiError('Fps, timecodes or video files must be provided if keyframes are used')
     else:
-        keyframes = None
+        src_keyframes = None
+        dst_keyframes = None
 
     # after this point nothing should fail so it's safe to start slow operations
     # like running the actual demuxing
@@ -414,9 +419,10 @@ def run(args):
     dst_demuxer.demux()
 
     try:
-        if keyframes:
+        if src_keyframes:
             timecodes = Timecodes.cfr(args.dst_fps) if args.dst_fps else Timecodes.from_file(timecodes_file)
-            keytimes = [timecodes.get_frame_time(f) for f in keyframes]
+            src_keytimes = [timecodes.get_frame_time(f) for f in src_keyframes]
+            dst_keytimes = [timecodes.get_frame_time(f) for f in dst_keyframes]
 
         script = AssScript(src_script_path) if script_extension == '.ass' else SrtScript(src_script_path)
         script.sort_by_time()
@@ -449,14 +455,14 @@ def run(args):
                 logging.info(u'Group (start: {0}, end: {1}, lines: {2}), '
                              u'shifts (start: {3}, end: {4}, average: {5})'
                              .format(format_time(g[0].start), format_time(g[-1].end), len(g), start_shift, end_shift, avg_shift))
-                if keyframes:
-                    find_keyframes_nearby(g, keytimes)
-                    snap_to_keyframes(g, timecodes, args.max_kf_distance, args.max_kf_snapping)
+                # if src_keyframes:
+                #     find_keyframes_nearby(g, src_keytimes, dst_keytimes)
+                #     snap_to_keyframes(g, timecodes, args.max_kf_distance, args.max_kf_snapping)
             if args.write_avs:
                 write_shift_avs(dst_script_path + '.avs', groups, src_audio_path, dst_audio_path)
-        elif keyframes:
-            find_keyframes_nearby(events, keytimes)
-            snap_to_keyframes(events, timecodes, args.max_kf_distance, args.max_kf_snapping)
+        # elif src_keyframes:
+        #     find_keyframes_nearby(events, src_keytimes, dst_keytimes)
+        #     snap_to_keyframes(events, timecodes, args.max_kf_distance, args.max_kf_snapping)
 
         apply_shifts(events)
 
@@ -513,8 +519,10 @@ def create_arg_parser():
                         help="XML or OGM chapters to use instead of any found in the source. 'none' to disable.")
     parser.add_argument('--script', default=None, dest='script_file', metavar='<filename>',
                         help='Subtitle file path to use instead of any found in the source')
-    parser.add_argument('--keyframes', default=None, dest='keyframes_file', metavar='<filename>',
-                        help='Keyframes file path to use.')
+    parser.add_argument('--dst-keyframes', default=None, dest='dst_keyframes', metavar='<filename>',
+                        help='Destination keyframes file')
+    parser.add_argument('--src-keyframes', default=None, dest='src_keyframes', metavar='<filename>',
+                        help='Source keyframes file')
     parser.add_argument('--fps', default=None, type=float, dest='dst_fps', metavar='<fps>',
                         help='Fps of destination video. Must be provided if keyframes are used.')
     parser.add_argument('--timecodes', default=None, dest='timecodes_file', metavar='<filename>',

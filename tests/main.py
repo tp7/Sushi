@@ -18,7 +18,7 @@ class MainScriptTestCase(unittest.TestCase):
 
     def test_checks_that_files_exist(self, mock_object):
         keys = ['--dst', 'dst', '--src', 'src', '--script', 'script', '--chapters', 'chapters',
-                '--keyframes', 'keyframes', '--timecodes', 'tcs']
+                '--dst-keyframes', 'dst-keyframes', '--src-keyframes', 'src-keyframes', '--timecodes', 'tcs']
         try:
             parse_args_and_run(keys)
         except SushiError:
@@ -27,7 +27,8 @@ class MainScriptTestCase(unittest.TestCase):
         mock_object.assert_any_call('dst', ANY)
         mock_object.assert_any_call('script', ANY)
         mock_object.assert_any_call('chapters', ANY)
-        mock_object.assert_any_call('keyframes', ANY)
+        mock_object.assert_any_call('dst-keyframes', ANY)
+        mock_object.assert_any_call('src-keyframes', ANY)
         mock_object.assert_any_call('tcs', ANY)
 
     def test_raises_on_unknown_script_type(self, ignore):
