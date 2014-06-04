@@ -177,47 +177,44 @@ def fix_near_borders(events):
     fix_border(events)
     fix_border(list(reversed(events)))
 
-
-def find_keyframes_nearby(events, src_keyframes, dst_keyframes):
-    def find_closest_kf(timestamp, keyframes):
+def snap_to_keyframes(group, src_keytimes, dst_keytimes, timecodes, max_kf_snapping):
+    def distance_to_closest_kf(timestamp, keyframes):
         idx = bisect.bisect_left(keyframes, timestamp)
         if idx == 0:
-            return keyframes[0]
-        if idx == len(keyframes):
-            return keyframes[-1]
-        before = keyframes[idx - 1]
-        after = keyframes[idx]
-        return after if after - timestamp < timestamp - before else before
+            kf = keyframes[0]
+        elif idx == len(keyframes):
+            kf = keyframes[-1]
+        else:
+            before = keyframes[idx - 1]
+            after = keyframes[idx]
+            kf = after if after - timestamp < timestamp - before else before
+        return kf - timestamp
 
-    for event in events:
-        before = find_closest_kf(event.start + event.shift, dst_keyframes)
-        after = find_closest_kf(event.end + event.shift, dst_keyframes)
-        event.set_keyframes(before, after)
+    src_before = distance_to_closest_kf(group[0].start, src_keytimes)
+    src_after = distance_to_closest_kf(group[-1].end, src_keytimes)
 
+    dst_before = distance_to_closest_kf(group[0].start + group[0].shift, dst_keytimes)
+    dst_after = distance_to_closest_kf(group[-1].end + group[-1].shift, dst_keytimes)
 
-def snap_to_keyframes(events, timecodes, max_kf_distance, max_kf_snapping):
-    max_kf_distance = max(max_kf_distance, max_kf_snapping)
-    distances = []
-    frame_sizes = []
-    for event in events:
-        frame_sizes.append(timecodes.get_frame_size(event.start))
-        for d in event.get_keyframes_distances():
-            if d is not None and abs(d) < (max_kf_distance * frame_sizes[-1]):
-                distances.append(d)
+    snapping_limit = timecodes.get_frame_size(group[0].start) * max_kf_snapping
 
-    mean_fs = np.mean(frame_sizes)
-    if not distances:
-        logging.info('No lines close enough to keyframes. Mean frame size: {0}'.format(mean_fs))
+    if abs(dst_before) > snapping_limit and abs(dst_after) > snapping_limit:
         return
-    mean = np.mean(distances)
-    snap = abs(mean) < (max_kf_snapping * mean_fs)
-    logging.info('{0} to keyframes [distance: {1}, frame size: {2}]'
-                 .format('Snapping' if snap else 'Not snapping', mean, mean_fs))
 
-    if snap:
-        for event in filter(lambda x: not x.linked, events):
-            event.adjust_shift(mean)
+    if dst_before <= snapping_limit and dst_after <= snapping_limit:
+        if abs(dst_before) < abs(dst_after):
+            shift = dst_before if abs(dst_before - src_before) < snapping_limit else 0
+        else:
+            shift = dst_after if abs(dst_after - src_after) < snapping_limit else 0
+    elif dst_before <= snapping_limit:
+        shift = dst_before if abs(dst_before - src_before) < snapping_limit else 0
+    else:
+        shift = dst_after if abs(dst_after - src_after) < snapping_limit else 0
 
+    if shift:
+        logging.debug('{0}-{1}, corrected by {2}'.format(format_time(group[0].start), format_time(group[-1].end), shift))
+        for e in group:
+            e.adjust_shift(shift)
 
 def average_shifts(events):
     events = [e for e in events if not e.linked]
@@ -231,7 +228,7 @@ def average_shifts(events):
 
 def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast_skip, max_ts_duration,
                      max_ts_distance):
-    small_window = 2
+    small_window = 1
     last_shift = 0
 
     for idx, event in enumerate(events):
@@ -290,7 +287,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast
         except StopIteration:
             passed_groups.append(group)
 
-    for search_group in passed_groups:
+    for idx, search_group in enumerate(passed_groups):
         tv_audio = src_stream.get_substream(search_group[0].start, search_group[-1].end)
 
         original_time = search_group[0].start
@@ -312,6 +309,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast
         last_shift = time_offset = new_time - original_time
 
         for e in search_group:
+            e.set_group(idx)
             e.set_shift(time_offset, diff)
             logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
                           .format(format_time(e.start), format_time(e.end), time_offset, diff))
@@ -351,6 +349,9 @@ def run(args):
 
     if src_demuxer.is_wav and not args.script_file:
         raise SushiError("Script file isn't specified")
+
+    if (args.src_keyframes and not args.dst_keyframes) or (args.dst_keyframes and not args.src_keyframes):
+        raise SushiError('Either none or both of src and dst keyframes should be provided')
 
     # selecting source audio
     if src_demuxer.is_wav:
@@ -467,14 +468,14 @@ def run(args):
                              u'shifts (start: {3}, end: {4}, average: {5})'
                              .format(format_time(g[0].start), format_time(g[-1].end), len(g), start_shift, end_shift,
                                      avg_shift))
-                # if src_keyframes:
-                # find_keyframes_nearby(g, src_keytimes, dst_keytimes)
-                #     snap_to_keyframes(g, timecodes, args.max_kf_distance, args.max_kf_snapping)
             if args.write_avs:
                 write_shift_avs(dst_script_path + '.avs', groups, src_audio_path, dst_audio_path)
-        # elif src_keyframes:
-        # find_keyframes_nearby(events, src_keytimes, dst_keytimes)
-        #     snap_to_keyframes(events, timecodes, args.max_kf_distance, args.max_kf_snapping)
+
+        # re-create original search groups of merged typesetting, large lines etc.
+        if src_keyframes:
+            groups = [list(g) for k, g in groupby((e for e in events if not e.linked), lambda e: e.group)]
+            for group in groups:
+                snap_to_keyframes(group, src_keytimes, dst_keytimes, timecodes, args.max_kf_snapping)
 
         apply_shifts(events)
 
@@ -495,8 +496,6 @@ def create_arg_parser():
                         help='Split events into groups before shifting')
     parser.add_argument('--min-group-size', default=1, type=int, dest='min_group_size',
                         help='Minimum size of automatic group')
-    parser.add_argument('--max-kf-distance', default=3, type=float, metavar='<frames>', dest='max_kf_distance',
-                        help='Maximum distance to keyframe for it to be considered in keyframe snapping [3]')
     parser.add_argument('--max-kf-snapping', default=0.75, type=float, metavar='<frames>', dest='max_kf_snapping',
                         help='Maximum keyframe snapping distance [0.75]')
 

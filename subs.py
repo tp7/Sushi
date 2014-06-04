@@ -37,6 +37,9 @@ class ScriptEventBase(object):
         self.start += self.shift
         self.end += self.shift
 
+    def set_group(self, group):
+        self.group = group
+
     def set_shift(self, shift, audio_diff):
         if self.linked:
             self._resolve_link()
