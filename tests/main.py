@@ -115,3 +115,6 @@ class FormatTimeTestCase(unittest.TestCase):
 
     def test_format_time_hours(self):
         self.assertEqual('1:15:35.15', format_time(3600 + 60*15 + 35.15))
+
+    def test_format_100ms(self):
+        self.assertEqual('0:09:05.00', format_time(544.997))
