@@ -226,6 +226,32 @@ def average_shifts(events):
     return avg
 
 
+def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts_distance):
+    search_groups = []
+    chapter_times = iter(chapter_times[1:] + [100000000])
+    next_chapter = next(chapter_times)
+    events = iter(events)
+    event = next(events, None)
+    while event:
+        while event.end > next_chapter:
+            next_chapter = next(chapter_times)
+
+        if event.duration > max_ts_duration:
+            search_groups.append([event])
+            event = next(events, None)
+        else:
+            group = [event]
+            event = next(events, None)
+            while event and event.duration < max_ts_duration and abs(event.start - group[-1].end) < max_ts_distance \
+                    and event.end <= next_chapter:
+                group.append(event)
+                event = next(events, None)
+
+            search_groups.append(group)
+
+    return search_groups
+
+
 def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast_skip, max_ts_duration,
                      max_ts_distance):
     small_window = 1
@@ -256,30 +282,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast
 
     events = (e for e in events if not e.linked and not e.broken)
 
-    search_groups = []
-    chapter_times = iter(chapter_times[1:] + [100000000])
-    next_chapter = next(chapter_times)
-    event = next(events, None)
-    while event:
-        while event.end > next_chapter:
-            next_chapter = next(chapter_times)
-
-        if event.duration > max_ts_duration:
-            search_groups.append([event])
-            event = next(events, None)
-        else:
-            group = [event]
-            event = next(events, None)
-            while event and event.duration < max_ts_duration and abs(event.start - group[-1].end) < max_ts_distance \
-                    and event.end <= next_chapter:
-                group.append(event)
-                event = next(events, None)
-
-            search_groups.append(group)
-
-    for idx, group in enumerate(search_groups):
-        for event in group:
-            event.set_group(idx)
+    search_groups = merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts_distance)
 
     passed_groups = []
     for idx, group in enumerate(search_groups):
@@ -476,7 +479,10 @@ def run(args):
 
         # re-create original search groups of merged typesetting.
         if src_keyframes:
-            groups = [list(g) for k, g in groupby((e for e in events if not e.linked), lambda e: e.group)]
+            for e in (x for x in events if x.linked):
+                e._resolve_link()
+
+            groups = merge_short_lines_into_groups(events, chapter_times, args.max_ts_duration, args.max_ts_distance)
             for group in groups:
                 snap_to_keyframes(group, src_keytimes, dst_keytimes, timecodes, args.max_kf_snapping)
 
