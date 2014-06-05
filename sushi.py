@@ -227,6 +227,7 @@ def average_shifts(events):
 
 
 def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts_distance):
+    events = sorted(events, key=lambda x: x.style)
     search_groups = []
     chapter_times = iter(chapter_times[1:] + [100000000])
     next_chapter = next(chapter_times)
@@ -249,7 +250,7 @@ def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts
 
             search_groups.append(group)
 
-    return search_groups
+    return sorted(search_groups, key= lambda x: x[0].start)
 
 
 def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast_skip, max_ts_duration,

@@ -90,6 +90,7 @@ class SrtEvent(ScriptEventBase):
         super(SrtEvent, self).__init__(start, end)
         self.idx = int(lines[0])
         self.text = lines[2]
+        self.style = None
 
     @staticmethod
     def _parse_srt_time(string):
