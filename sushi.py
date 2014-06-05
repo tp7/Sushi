@@ -277,6 +277,10 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast
 
             search_groups.append(group)
 
+    for idx, group in enumerate(search_groups):
+        for event in group:
+            event.set_group(idx)
+
     passed_groups = []
     for idx, group in enumerate(search_groups):
         try:
@@ -309,7 +313,6 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast
         last_shift = time_offset = new_time - original_time
 
         for e in search_group:
-            e.set_group(idx)
             e.set_shift(time_offset, diff)
             logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
                           .format(format_time(e.start), format_time(e.end), time_offset, diff))
@@ -471,7 +474,7 @@ def run(args):
             if args.write_avs:
                 write_shift_avs(dst_script_path + '.avs', groups, src_audio_path, dst_audio_path)
 
-        # re-create original search groups of merged typesetting, large lines etc.
+        # re-create original search groups of merged typesetting.
         if src_keyframes:
             groups = [list(g) for k, g in groupby((e for e in events if not e.linked), lambda e: e.group)]
             for group in groups:
