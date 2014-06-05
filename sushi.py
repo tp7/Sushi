@@ -203,13 +203,13 @@ def snap_to_keyframes(group, src_keytimes, dst_keytimes, timecodes, max_kf_snapp
 
     if dst_before <= snapping_limit and dst_after <= snapping_limit:
         if abs(dst_before) < abs(dst_after):
-            shift = dst_before if abs(dst_before - src_before) < snapping_limit else 0
+            shift = dst_before - src_before if abs(dst_before - src_before) < snapping_limit else 0
         else:
-            shift = dst_after if abs(dst_after - src_after) < snapping_limit else 0
+            shift = dst_after - src_after if abs(dst_after - src_after) < snapping_limit else 0
     elif dst_before <= snapping_limit:
-        shift = dst_before if abs(dst_before - src_before) < snapping_limit else 0
+        shift = dst_before - src_before if abs(dst_before - src_before) < snapping_limit else 0
     else:
-        shift = dst_after if abs(dst_after - src_after) < snapping_limit else 0
+        shift = dst_after - src_after if abs(dst_after - src_after) < snapping_limit else 0
 
     if shift:
         logging.debug('{0}-{1}, corrected by {2}'.format(format_time(group[0].start), format_time(group[-1].end), shift))
