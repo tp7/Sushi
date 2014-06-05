@@ -2,7 +2,7 @@ import os
 import re
 import unittest
 from mock import patch, ANY
-from common import SushiError
+from common import SushiError, format_time
 from sushi import parse_args_and_run, detect_groups
 
 here = os.path.dirname(os.path.abspath(__file__))
@@ -101,3 +101,17 @@ class GroupSplittingTestCase(unittest.TestCase):
         groups = detect_groups(events, min_group_size=5)
         self.assertEqual(2, len(groups[0]))
         self.assertEqual(3, len(groups[1]))
+
+
+class FormatTimeTestCase(unittest.TestCase):
+    def test_format_time_zero(self):
+        self.assertEqual('0:00:00.00', format_time(0))
+
+    def test_format_time_65_seconds(self):
+        self.assertEqual('0:01:05.00', format_time(65))
+
+    def test_format_time_float_seconds(self):
+        self.assertEqual('0:00:05.56', format_time(5.559))
+
+    def test_format_time_hours(self):
+        self.assertEqual('1:15:35.15', format_time(3600 + 60*15 + 35.15))
