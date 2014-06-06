@@ -1,4 +1,3 @@
-import logging
 import codecs
 import os
 from common import SushiError, format_time
@@ -37,19 +36,16 @@ class ScriptEventBase(object):
         self.start += self.shift
         self.end += self.shift
 
-    def set_group(self, group):
-        self.group = group
-
     def set_shift(self, shift, audio_diff):
         if self.linked:
-            self._resolve_link()
+            self.resolve_link()
         self._shift = shift
         self._diff = audio_diff
 
     def link_event(self, other):
         self._linked_event = other
 
-    def _resolve_link(self):
+    def resolve_link(self):
         if not self.linked:
             raise Exception('This is a bug')
         self.broken = self._linked_event.broken
@@ -60,15 +56,6 @@ class ScriptEventBase(object):
     @property
     def linked(self):
         return self._linked_event is not None
-
-    def set_keyframes(self, prev_kf, next_kf):
-        self.prev_kf = prev_kf
-        self.next_kf = next_kf
-
-    def get_keyframes_distances(self):
-        p = None if self.prev_kf is None else self.prev_kf - (self.start + self.shift)
-        n = None if self.next_kf is None else self.next_kf - (self.end + self.shift)
-        return (p,n)
 
     def adjust_shift(self, value):
         if self.linked:

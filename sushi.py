@@ -481,7 +481,7 @@ def run(args):
         # re-create original search groups of merged typesetting.
         if src_keyframes:
             for e in (x for x in events if x.linked):
-                e._resolve_link()
+                e.resolve_link()
 
             groups = merge_short_lines_into_groups(events, chapter_times, args.max_ts_duration, args.max_ts_distance)
             for group in groups:
