@@ -291,7 +291,7 @@ def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts
     return sorted(search_groups, key=lambda x: x[0].start)
 
 
-def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast_skip, max_ts_duration,
+def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_ts_duration,
                      max_ts_distance):
     small_window = 1.5
     last_shift = 0
@@ -306,18 +306,18 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast
                 event.mark_broken()
             else:
                 event.link_event(events[idx - 1])
-        elif fast_skip:
-            # assuming scripts are sorted by start time so we don't search the entire collection
-            same_start = lambda x: event.start == x.start
-            try:
-                processed = next(
-                    (x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end),
-                    None)
-                event.link_event(processed)
-                # logging.debug('{0}-{1}: skipped because identical to already processed (typesetting?)'
-                # .format(format_time(event.start), format_time(event.end)))
-            except StopIteration:
-                pass
+
+        # assuming scripts are sorted by start time so we don't search the entire collection
+        same_start = lambda x: event.start == x.start
+        try:
+            processed = next(
+                (x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end),
+                None)
+            event.link_event(processed)
+            # logging.debug('{0}-{1}: skipped because identical to already processed (typesetting?)'
+            # .format(format_time(event.start), format_time(event.end)))
+        except StopIteration:
+            pass
 
     events = (e for e in events if not e.linked and not e.broken)
 
@@ -490,7 +490,6 @@ def run(args):
         calculate_shifts(src_stream, dst_stream, script.events,
                          chapter_times=chapter_times,
                          window=args.window,
-                         fast_skip=args.fast_skip,
                          max_ts_duration=args.max_ts_duration,
                          max_ts_distance=args.max_ts_distance)
 
@@ -564,9 +563,6 @@ def create_arg_parser():
     parser.add_argument('--test-write-avs', action='store_true', dest='write_avs')
 
     # optimizations
-    parser.add_argument('--no-fast-skip', action='store_false', dest='fast_skip',
-                        help="Don't skip lines with identical timing")
-
     parser.add_argument('--sample-rate', default=12000, type=int, metavar='<rate>', dest='sample_rate',
                         help='Downsampled audio sample rate')
     parser.add_argument('--sample-type', default='uint8', choices=['float32', 'uint8'], dest='sample_type',

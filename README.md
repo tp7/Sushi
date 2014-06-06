@@ -16,7 +16,7 @@ During loading, both audio streams will be downsampled and converted to internal
 
 Of course it won't search the whole stream for every line. Instead, a small window (2 seconds in every direction, 4 total) is searched first, centered at the `original time + shift of the last line` position. If the script cannot find a reasonably good match in this window, it increases the search area to a larger value (20 seconds total by default) and attempts to search again, but this time the closest found match will be considered correct. You can control the size of the larger search window using the `--window` argument.
 
-Also, the script won't attempt to search for a line if a line with identical start and end times has been already processed. This is very useful for typesetting and can significantly improve performance, but you can still disable it with the `--no-fast-skip` switch.
+Also, the script won't attempt to search for a line if a line with identical start and end times has been already processed. This is very useful for typesetting and can significantly improve performance.
 
 Then, the script will try to split all lines into groups. It can either try to build these groups automatically (lines with similar shift are grouped), or get them from chapters (XML or OGM), provided with `--chapters` argument. This is done because it is very unlikely for every line to have its own shift (unless there's some frame rate problems). Shift values of all events in every group are used to calculate weighted average (where weight is the coefficient of similarity of audio streams, calculated before). Of course you can disable grouping with `--no-grouping` switch.
 
