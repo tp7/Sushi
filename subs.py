@@ -16,6 +16,8 @@ class ScriptEventBase(object):
         self.start = start
         self.end = end
         self._linked_event = None
+        self._start_shift = 0
+        self._end_shift = 0
 
     def mark_broken(self):
         self.broken = True
@@ -33,21 +35,27 @@ class ScriptEventBase(object):
         return self.end - self.start
 
     def apply_shift(self):
-        self.start += self.shift
-        self.end += self.shift
+        self.start += self.shift + self._start_shift
+        self.end += self.shift + self._end_shift
 
     def set_shift(self, shift, audio_diff):
         if self.linked:
-            self.resolve_link()
+            raise Exception('Cannot set shift of a linked event. This is a bug')
         self._shift = shift
         self._diff = audio_diff
+
+    def set_additional_shifts(self, start_shift, end_shift):
+        if self.linked:
+            raise Exception('Cannot apply additional shifts to a linked event. This is a bug')
+        self._start_shift = start_shift
+        self._end_shift = end_shift
 
     def link_event(self, other):
         self._linked_event = other
 
     def resolve_link(self):
         if not self.linked:
-            raise Exception('This is a bug')
+            raise Exception('Cannot resolve unlinked events. This is a bug')
         self.broken = self._linked_event.broken
         self._shift = self._linked_event.shift
         self._diff = self._linked_event.diff
