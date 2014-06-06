@@ -177,7 +177,8 @@ def fix_near_borders(events):
     fix_border(events)
     fix_border(list(reversed(events)))
 
-def snap_to_keyframes(group, src_keytimes, dst_keytimes, timecodes, max_kf_snapping):
+
+def find_keyframe_shift(group, src_keytimes, dst_keytimes, timecodes, max_kf_snapping):
     def distance_to_closest_kf(timestamp, keyframes):
         idx = bisect.bisect_left(keyframes, timestamp)
         if idx == 0:
@@ -211,10 +212,26 @@ def snap_to_keyframes(group, src_keytimes, dst_keytimes, timecodes, max_kf_snapp
     else:
         shift = dst_after - src_after if abs(dst_after - src_after) < snapping_limit else 0
 
-    if shift:
-        logging.debug('{0}-{1}, corrected by {2}'.format(format_time(group[0].start), format_time(group[-1].end), shift))
-        for e in group:
-            e.adjust_shift(shift)
+    return shift
+    # if shift:
+    #     logging.debug('{0}-{1}, corrected by {2}'.format(format_time(group[0].start), format_time(group[-1].end), shift))
+    #     for e in group:
+    #         e.adjust_shift(shift)
+
+
+def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_distance, src_keytimes, dst_keytimes, timecodes, max_kf_snapping):
+    groups = merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts_distance)
+    shifts = [find_keyframe_shift(g, src_keytimes, dst_keytimes, timecodes, max_kf_snapping) for g in groups]
+    for idx, s in enumerate(shifts):
+        print(format_time(groups[idx][0].start), format_time(groups[idx][-1].end), s)
+    shifts = [s for s in shifts if s is not None]
+    average_shift = np.average(shifts)
+    if average_shift:
+        logging.debug('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), average_shift))
+        for e in events:
+            e.adjust_shift(average_shift)
+
+
 
 def average_shifts(events):
     events = [e for e in events if not e.linked]
@@ -250,7 +267,7 @@ def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts
 
             search_groups.append(group)
 
-    return sorted(search_groups, key= lambda x: x[0].start)
+    return sorted(search_groups, key=lambda x: x[0].start)
 
 
 def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, fast_skip, max_ts_duration,
@@ -479,13 +496,14 @@ def run(args):
                 write_shift_avs(dst_script_path + '.avs', groups, src_audio_path, dst_audio_path)
 
         # re-create original search groups of merged typesetting.
-        if src_keyframes:
-            for e in (x for x in events if x.linked):
-                e.resolve_link()
-
-            groups = merge_short_lines_into_groups(events, chapter_times, args.max_ts_duration, args.max_ts_distance)
-            for group in groups:
-                snap_to_keyframes(group, src_keytimes, dst_keytimes, timecodes, args.max_kf_snapping)
+            if src_keyframes:
+                for e in (x for x in events if x.linked):
+                    e.resolve_link()
+                for g in groups:
+                    snap_groups_to_keyframes(g, chapter_times, args.max_ts_duration, args.max_ts_distance, src_keytimes, dst_keytimes, timecodes, args.max_kf_snapping)
+                    # ts_groups = merge_short_lines_into_groups(events, chapter_times, args.max_ts_duration, args.max_ts_distance)
+                    # for group in ts_groups:
+                    #     find_keyframe_shift(group, src_keytimes, dst_keytimes, timecodes, args.max_kf_snapping)
 
         apply_shifts(events)
 
@@ -504,17 +522,17 @@ def create_arg_parser():
                         help='Search window size')
     parser.add_argument('--no-grouping', action='store_false', dest='grouping',
                         help='Split events into groups before shifting')
-    parser.add_argument('--min-group-size', default=1, type=int, dest='min_group_size',
+    parser.add_argument('--min-group-size', default=3, type=int, dest='min_group_size',
                         help='Minimum size of automatic group')
     parser.add_argument('--max-kf-snapping', default=0.75, type=float, metavar='<frames>', dest='max_kf_snapping',
                         help='Maximum keyframe snapping distance [0.75]')
 
-    # 2.5 frames at 23.976
-    parser.add_argument('--max-ts-duration', default=1001.0 / 24000.0 * 2.5, type=float, metavar='<seconds>',
+    # 10 frames at 23.976
+    parser.add_argument('--max-ts-duration', default=1001.0 / 24000.0 * 10, type=float, metavar='<seconds>',
                         dest='max_ts_duration',
                         help='Maximum duration of a line to be considered typesetting')
-    # 5 frames at 23.976
-    parser.add_argument('--max-ts-distance', default=1001.0 / 24000.0 * 5, type=float, metavar='<seconds>',
+    # 10 frames at 23.976
+    parser.add_argument('--max-ts-distance', default=1001.0 / 24000.0 * 10, type=float, metavar='<seconds>',
                         dest='max_ts_distance',
                         help='Maximum distance between two adjacent typesetting lines to be merged')
 
