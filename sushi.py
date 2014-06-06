@@ -244,7 +244,7 @@ def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_dist
         for e in events:
             e.adjust_shift(average_shift)
 
-    #  step 2: snap start/end times separately to hanle cases
+    # step 2: snap start/end times separately to hanle cases
     for g in groups:
         if len(g) > 1:
             pass  # we don't snap typesetting
@@ -546,7 +546,7 @@ def create_arg_parser():
                         help='Search window size')
     parser.add_argument('--no-grouping', action='store_false', dest='grouping',
                         help='Split events into groups before shifting')
-    parser.add_argument('--min-group-size', default=3, type=int, dest='min_group_size',
+    parser.add_argument('--min-group-size', default=1, type=int, dest='min_group_size',
                         help='Minimum size of automatic group')
     parser.add_argument('--max-kf-snapping', default=0.75, type=float, metavar='<frames>', dest='max_kf_snapping',
                         help='Maximum keyframe snapping distance [0.75]')

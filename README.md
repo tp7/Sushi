@@ -5,22 +5,28 @@ Automatic subtitle shifter for SRT and ASS based on audio streams.
 This script is in beta so don't expect it to handle any complicated cases or malformed input, have nice error reporting or super advanced features.
 
 ### Purpose
-Imagine you've got a subtitle file synced to one video file, but you want to use these subtitles with some other video you've got via totally legal ways. The common example is TV vs. BD releases, PAL vs. NTSC video and releases in different countries. In a lot of cases, subtitles won't match right away and you need to sync them.
+Imagine you've got a subtitle file synced to one video file, but you want to use these subtitles with some other video you've got via totally legal means. The common example is TV vs. BD releases, PAL vs. NTSC video and releases in different countries. In a lot of cases, subtitles won't match right away and you need to sync them.
 
 The purpose of this script is to avoid all the hassle of manual syncing. It attempts to synchronize subtitles by finding similarities in audio streams. The script is very fast and can be used right when you want to watch something.
 
 ### How it works
 You need to provide two audio files and a subtitle file (.ass or .srt) that matches one of those files. For every line in the subtitles, the script will extract corresponding audio from the source audio stream and will try to find the closest similar pattern in the destination audio stream. The shift found will be applied to the subtitles.
 
-During loading, both audio streams will be downsampled and converted to internal representation suitable for OpenCV (12kHz, 8bit samples). You can control downsampling with `--sample-rate` and `--sample-type` arguments, however it's not recommended to touch these values unless you get some problems with the defaults or you have many small lines (e.g frame-by-frame typesetting usually works better with 24kHz).
+During loading, both audio streams will be downsampled and converted to internal representation suitable for OpenCV (12kHz, 8bit samples). You can control downsampling with `--sample-rate` and `--sample-type` arguments, however it's not recommended to touch these values unless you get some problems with the defaults or you have many short lines (e.g frame-by-frame typesetting sometimes works better with 24kHz).
 
-Of course it won't search the whole stream for every line. Instead, a small window (2 seconds in every direction, 4 total) is searched first, centered at the `original time + shift of the last line` position. If the script cannot find a reasonably good match in this window, it increases the search area to a larger value (20 seconds total by default) and attempts to search again, but this time the closest found match will be considered correct. You can control the size of the larger search window using the `--window` argument.
+Of course it won't search the whole stream for every line. Instead, a small window (1.5 seconds in every direction, 3 total) is searched first, centered at the `original time + shift of the last line` position. If the script cannot find a reasonably good match in this window, it increases the search area to a larger value (20 seconds total by default) and attempts to search again, but this time the closest found match will be considered correct. You can control the size of the larger search window using the `--window` argument.
 
-Also, the script won't attempt to search for a line if a line with identical start and end times has been already processed. This is very useful for typesetting and can significantly improve performance.
+Also, the script tries to detect frame-by-frame (fbf) typesetting and merge it into large groups for better shift detection (longer audio samples produce more accurate results). Adjacent lines are considered fbf typesetting and merged into a group if the distance between them is lower than `--max-ts-distance` (0.42 second by default) and none of the lines is longer than `--max-ts-duration` (0.42 seconds). Lines are never merged across chapter points so this feature should be relatively safe. 
 
-Then, the script will try to split all lines into groups. It can either try to build these groups automatically (lines with similar shift are grouped), or get them from chapters (XML or OGM), provided with `--chapters` argument. This is done because it is very unlikely for every line to have its own shift (unless there's some frame rate problems). Shift values of all events in every group are used to calculate weighted average (where weight is the coefficient of similarity of audio streams, calculated before). Of course you can disable grouping with `--no-grouping` switch.
+Then, the script will try to split all lines into groups. It can either try to build these groups automatically (lines with similar shift are grouped), or get them from chapters (XML or OGM), provided with `--chapters` argument. This is done because it is very unlikely for every line to have its own shift (unless there's some frame rate problems). Shift values of all events in every group are used to calculate weighted average (where weight is the coefficient of similarity of audio streams, calculated before). Of course you can disable grouping with `--no-grouping` switch. You can also control the minimal size of automatic groups using the `--min-group-size` argument.
 
-Finally, sushi applies calculated shift to every line and writes the output file.
+After all shifts are calculated and smoothed, Sushi will try to postprocess them using keyframes. For keyframe snapping to work, you need to provide three things:
+
+1. Video fps, either using the `--fps` or `--timecodes` arguments. If source file is video, Sushi will try to extract timecodes automatically.
+2. Destination video keyframes, using the `--dst-keyframes` argument, `XviD 2pass stat file` format.
+3. Source video keyframes, using the `--src-keyframes` argument, same format.
+
+Maximum keyframe snapping distance can be configured using the `--max-kf-snapping` argument (0.75 frames by default).
 
 ### Usage
 The minimal command line looks like this:
