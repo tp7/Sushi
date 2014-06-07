@@ -1,9 +1,10 @@
+from collections import namedtuple
 import os
 import re
 import unittest
 from mock import patch, ANY
 from common import SushiError, format_time
-from sushi import parse_args_and_run, detect_groups, interpolate_zeroes, get_distance_to_closest_kf
+from sushi import parse_args_and_run, detect_groups, interpolate_zeroes, get_distance_to_closest_kf, fix_near_borders
 
 here = os.path.dirname(os.path.abspath(__file__))
 
@@ -140,6 +141,28 @@ class InterpolationTestCase(unittest.TestCase):
 
     def test_copies_values_to_borders(self):
         self.assertEqual(interpolate_zeroes([0,0,2,0,0]), [2,2,2,2,2])
+
+
+class BorderFixingTestCase(unittest.TestCase):
+    class FakeEvent(object):
+        def __init__(self, diff):
+            self.diff = diff
+            self.linked = None
+
+        def link_event(self, other):
+            self.linked = other
+
+    def test_propagates_last_correct_shift_to_broken_events(self):
+        events = [self.FakeEvent(x) for x in (0.9, 0.9, 1.0, 0.4, 0.5, 0.4, 0.3, 0.9, 1.0)]
+        fix_near_borders(events, 0.6)
+        sf = events[3]
+        sl = events[-3]
+        self.assertEqual([x.linked for x in events], [sf, sf, sf, None, None, None, None, sl, sl])
+
+    def test_returns_array_with_no_correct_events_unchanged(self):
+        events = [self.FakeEvent(x) for x in (0.9, 0.9, 0.9, 1.0, 0.9)]
+        fix_near_borders(events, 0.6)
+        self.assertEqual([x.linked for x in events], [None, None, None, None, None])
 
 
 class ClosestKeyframeDistanceTestCase(unittest.TestCase):

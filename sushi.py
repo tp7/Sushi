@@ -184,13 +184,18 @@ def clip_obviously_wrong(events):
             event.link_event(next_sane)
 
 
-def fix_near_borders(events):
+def fix_near_borders(events, max_diff):
     def fix_border(event_list):
-        broken = list(takewhile(lambda x: x.diff > MAX_REASONABLE_DIFF, event_list))
-        if broken:
+        broken = list(takewhile(lambda x: x.diff > max_diff, event_list))
+        if not broken:
+            return
+        try:
             sane = event_list[len(broken)]
-            for x in broken:
-                x.link_event(sane)
+        except IndexError:
+            return
+        for x in broken:
+            x.link_event(sane)
+
 
     fix_border(events)
     fix_border(list(reversed(events)))
@@ -527,7 +532,7 @@ def run(args):
 
         events = [x for x in script.events if not x.broken]
 
-        fix_near_borders(events)
+        fix_near_borders(events, MAX_REASONABLE_DIFF)
         # clip_obviously_wrong(events)
 
         if args.grouping:
