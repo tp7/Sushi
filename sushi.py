@@ -192,14 +192,16 @@ def get_distance_to_closest_kf(timestamp, keyframes):
 
 
 def find_keyframe_shift(group, src_keytimes, dst_keytimes, timecodes, max_kf_snapping):
+    last_event_frame_size = timecodes.get_frame_size(group[-1].end)
+
     src_before = get_distance_to_closest_kf(group[0].start, src_keytimes)
-    src_after = get_distance_to_closest_kf(group[-1].end, src_keytimes)
+    src_after = get_distance_to_closest_kf(group[-1].end + last_event_frame_size, src_keytimes)
 
     dst_before = get_distance_to_closest_kf(group[0].start + group[0].shift, dst_keytimes)
-    dst_after = get_distance_to_closest_kf(group[-1].end + group[-1].shift, dst_keytimes)
+    dst_after = get_distance_to_closest_kf(group[-1].end + group[-1].shift + last_event_frame_size, dst_keytimes)
 
     snapping_limit = timecodes.get_frame_size(group[0].start) * max_kf_snapping
-
+    
     if abs(dst_before) > snapping_limit and abs(dst_after) > snapping_limit:
         return 0
     elif dst_before <= snapping_limit and dst_after <= snapping_limit:
@@ -233,8 +235,10 @@ def find_keyframes_distances(event, src_keytimes, dst_keytimes, timecodes, max_k
 
 
 def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_distance, src_keytimes, dst_keytimes, timecodes, max_kf_snapping):
-    groups = merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts_distance)
+    if not max_kf_snapping:
+        return
 
+    groups = merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts_distance)
     #  step 1: snap events without changing their duration. Useful for some slight audio imprecision correction
     shifts = [find_keyframe_shift(g, src_keytimes, dst_keytimes, timecodes, max_kf_snapping) for g in groups]
     shifts = [s for s in shifts if s is not None]
