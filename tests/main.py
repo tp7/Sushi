@@ -3,7 +3,7 @@ import re
 import unittest
 from mock import patch, ANY
 from common import SushiError, format_time
-from sushi import parse_args_and_run, detect_groups, interpolate_zeroes
+from sushi import parse_args_and_run, detect_groups, interpolate_zeroes, get_distance_to_closest_kf
 
 here = os.path.dirname(os.path.abspath(__file__))
 
@@ -140,3 +140,19 @@ class InterpolationTestCase(unittest.TestCase):
 
     def test_copies_values_to_borders(self):
         self.assertEqual(interpolate_zeroes([0,0,2,0,0]), [2,2,2,2,2])
+
+
+class ClosestKeyframeDistanceTestCase(unittest.TestCase):
+    KEYTIMES = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+
+    def test_finds_correct_distance_to_first_keyframe(self):
+        self.assertEqual(get_distance_to_closest_kf(0, self.KEYTIMES), 0)
+
+    def test_finds_correct_distance_to_last_keyframe(self):
+        self.assertEqual(get_distance_to_closest_kf(105, self.KEYTIMES), -5)
+
+    def test_finds_correct_distance_to_keyframe_before(self):
+        self.assertEqual(get_distance_to_closest_kf(63, self.KEYTIMES), -3)
+
+    def test_finds_distance_to_keyframe_after(self):
+        self.assertEqual(get_distance_to_closest_kf(36, self.KEYTIMES), 4)
