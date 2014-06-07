@@ -53,6 +53,20 @@ def write_shift_avs(output_path, groups, src_audio, dst_audio):
         file.write(text)
 
 
+def interpolate_zeroes(data):
+    data = list(data)
+    data_idx = [idx for idx, value in enumerate(data) if value]
+    data_values = [value for value in data if value]
+    zero_idx = [idx for idx, value in enumerate(data) if not value]
+    out = iter(np.interp(zero_idx, data_idx, data_values))
+
+    for idx, value in enumerate(data):
+        if not value:
+            data[idx] = next(out, None)
+
+    return data
+
+
 # todo: implement this as a running median
 def smooth_events(events, window_size):
     if window_size % 2 != 1:
@@ -240,12 +254,13 @@ def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_dist
     groups = merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts_distance)
     #  step 1: snap events without changing their duration. Useful for some slight audio imprecision correction
     shifts = [find_keyframe_shift(g, src_keytimes, dst_keytimes, src_timecodes, dst_timecodes, max_kf_snapping) for g in groups]
-    shifts = [s for s in shifts if s is not None]
-    average_shift = np.average(shifts)
-    if average_shift:
-        logging.debug('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), average_shift))
-        for e in events:
-            e.adjust_shift(average_shift)
+    if not shifts:
+        return
+    shifts = interpolate_zeroes(shifts)
+
+    logging.debug('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), np.average(shifts)))
+    for idx, e in enumerate(events):
+        e.adjust_shift(shifts[idx])
 
     # step 2: snap start/end times separately to hanle cases
     for g in groups:
