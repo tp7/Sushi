@@ -20,7 +20,7 @@ Also, the script tries to detect frame-by-frame (fbf) typesetting and merge it i
 
 Then, the script will try to split all lines into groups. It can either try to build these groups automatically (lines with similar shift are grouped), or get them from chapters (XML or OGM), provided with `--chapters` argument. This is done because it is very unlikely for every line to have its own shift (unless there's some frame rate problems). Shift values of all events in every group are used to calculate weighted average (where weight is the coefficient of similarity of audio streams, calculated before). Of course you can disable grouping with `--no-grouping` switch. You can also control the minimal size of automatic groups using the `--min-group-size` argument.
 
-After all shifts are calculated and smoothed, Sushi will try to postprocess them using keyframes. For keyframe snapping to work, you need to provide three things:
+After all shifts are calculated and smoothed, Sushi will try to postprocess them using keyframes. For keyframe snapping to work, you need to provide four things:
 
 1. Video fps of the destination file, either using the `--dst-fps` or `--dst-timecodes` arguments. If destination file is a container, Sushi will try to extract timecodes automatically.
 2. Video fps of the source file. Same as before but the args are called `--src-fps` and `--src-timecodes`.
