@@ -22,9 +22,10 @@ Then, the script will try to split all lines into groups. It can either try to b
 
 After all shifts are calculated and smoothed, Sushi will try to postprocess them using keyframes. For keyframe snapping to work, you need to provide three things:
 
-1. Video fps, either using the `--fps` or `--timecodes` arguments. If source file is video, Sushi will try to extract timecodes automatically.
-2. Destination video keyframes, using the `--dst-keyframes` argument, `XviD 2pass stat file` format.
-3. Source video keyframes, using the `--src-keyframes` argument, same format.
+1. Video fps of the destination file, either using the `--dst-fps` or `--dst-timecodes` arguments. If destination file is a container, Sushi will try to extract timecodes automatically.
+2. Video fps of the source file. Same as before but the args are called `--src-fps` and `--src-timecodes`.
+3. Destination video keyframes, using the `--dst-keyframes` argument, `XviD 2pass stat file` format.
+4. Source video keyframes, using the `--src-keyframes` argument, same format.
 
 Maximum keyframe snapping distance can be configured using the `--max-kf-snapping` argument (0.75 frames by default).
 
