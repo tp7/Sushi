@@ -4,12 +4,26 @@ import re
 import unittest
 from mock import patch, ANY
 from common import SushiError, format_time
-from sushi import parse_args_and_run, detect_groups, interpolate_zeroes, get_distance_to_closest_kf, fix_near_borders
+from sushi import parse_args_and_run, detect_groups, interpolate_zeroes, get_distance_to_closest_kf, fix_near_borders, \
+    running_median, smooth_events
 
 here = os.path.dirname(os.path.abspath(__file__))
 
-def media(name):
-    return here + '/media/' + name
+class FakeEvent(object):
+    def __init__(self, shift=0.0, diff=0.0):
+        self.shift = shift
+        self.linked = None
+        self.diff = diff
+
+    def set_shift(self, shift, diff):
+        self.shift = shift
+        self.diff = diff
+
+    def link_event(self, other):
+        self.linked = other
+
+    def __repr__(self):
+        return repr(self.shift)
 
 @patch('sushi.check_file_exists')
 class MainScriptTestCase(unittest.TestCase):
@@ -48,20 +62,8 @@ class MainScriptTestCase(unittest.TestCase):
 
 
 class GroupSplittingTestCase(unittest.TestCase):
-    class FakeEvent(object):
-        def __init__(self, shift):
-            self.shift = shift
-            self.linked = False
-            self.diff = 0
-
-        def set_shift(self, shift, diff):
-            self.shift = shift
-
-        def __repr__(self):
-            return repr(self.shift)
-
     def event(self, shift):
-        return self.FakeEvent(shift)
+        return FakeEvent(shift)
 
     def test_splits_three_simple_groups(self):
         events = [self.event(0.5)] * 3 + [self.event(1.0)] * 10 + [self.event(0.5)]*5
@@ -143,24 +145,41 @@ class InterpolationTestCase(unittest.TestCase):
         self.assertEqual(interpolate_zeroes([0,0,2,0,0]), [2,2,2,2,2])
 
 
+class RunningMedianTestCase(unittest.TestCase):
+    def test_does_no_touch_border_values(self):
+        shifts = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        smooth = running_median(shifts, 5)
+        self.assertEqual(shifts, smooth)
+
+    def test_removes_broken_values(self):
+        shifts = [0.1, 0.1, 0.1, 9001, 0.1, 0.1, 0.1]
+        smooth = running_median(shifts, 5)
+        self.assertEqual(smooth, [0.1] * 7)
+
+
+class EventSmoothingTestCase(unittest.TestCase):
+    def test_smooths_events_shifts(self):
+        events = [FakeEvent(x) for x in (0.1, 0.1, 0.1, 9001, 7777, 0.1, 0.1, 0.1)]
+        smooth_events(events, 7)
+        self.assertEqual([x.shift for x in events], [0.1]*8)
+
+    def test_keeps_diff_values(self):
+        events = [FakeEvent(x, diff=x) for x in (0.1, 0.1, 0.1, 9001, 7777, 0.1, 0.1, 0.1)]
+        diffs = [x.diff for x in events]
+        smooth_events(events, 7)
+        self.assertEqual([x.diff for x in events], diffs)
+
+
 class BorderFixingTestCase(unittest.TestCase):
-    class FakeEvent(object):
-        def __init__(self, diff):
-            self.diff = diff
-            self.linked = None
-
-        def link_event(self, other):
-            self.linked = other
-
     def test_propagates_last_correct_shift_to_broken_events(self):
-        events = [self.FakeEvent(x) for x in (0.9, 0.9, 1.0, 0.4, 0.5, 0.4, 0.3, 0.9, 1.0)]
+        events = [FakeEvent(diff=x) for x in (0.9, 0.9, 1.0, 0.4, 0.5, 0.4, 0.3, 0.9, 1.0)]
         fix_near_borders(events, 0.6)
         sf = events[3]
         sl = events[-3]
         self.assertEqual([x.linked for x in events], [sf, sf, sf, None, None, None, None, sl, sl])
 
     def test_returns_array_with_no_correct_events_unchanged(self):
-        events = [self.FakeEvent(x) for x in (0.9, 0.9, 0.9, 1.0, 0.9)]
+        events = [FakeEvent(diff=x) for x in (0.9, 0.9, 0.9, 1.0, 0.9)]
         fix_near_borders(events, 0.6)
         self.assertEqual([x.linked for x in events], [None, None, None, None, None])
 

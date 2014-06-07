@@ -70,17 +70,25 @@ def interpolate_zeroes(data):
 
     return data
 
-
 # todo: implement this as a running median
-def smooth_events(events, window_size):
+def running_median(values, window_size):
     if window_size % 2 != 1:
         raise SushiError('Median window size should be odd')
     half_window = window_size // 2
-    for x in xrange(half_window, len(events) - half_window):
+    medians = values[:half_window]
+    for x in xrange(half_window, len(values) - half_window):
         start = max(0, x - half_window)
         end = x + half_window + 1
-        med = np.median([e.shift for e in events[start:end]])
-        events[x].set_shift(med, events[x].diff)
+        med = np.median([e for e in values[start:end]])
+        medians.append(med)
+    return medians + values[-half_window:]
+
+
+def smooth_events(events, window_size):
+    shifts = [e.shift for e in events]
+    smoothed = running_median(shifts, window_size)
+    for i, e in enumerate(events):
+        e.set_shift(smoothed[i], e.diff)
 
 
 def detect_groups(events, min_group_size):
