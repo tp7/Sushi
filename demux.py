@@ -202,6 +202,10 @@ class Demuxer(object):
         return self._is_wav
 
     @property
+    def path(self):
+        return self._path
+
+    @property
     def chapters(self):
         if self.is_wav:
             return []

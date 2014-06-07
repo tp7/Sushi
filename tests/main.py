@@ -18,7 +18,8 @@ class MainScriptTestCase(unittest.TestCase):
 
     def test_checks_that_files_exist(self, mock_object):
         keys = ['--dst', 'dst', '--src', 'src', '--script', 'script', '--chapters', 'chapters',
-                '--dst-keyframes', 'dst-keyframes', '--src-keyframes', 'src-keyframes', '--timecodes', 'tcs']
+                '--dst-keyframes', 'dst-keyframes', '--src-keyframes', 'src-keyframes',
+                '--src-timecodes', 'src-tcs', '--dst-timecodes', 'dst-tcs']
         try:
             parse_args_and_run(keys)
         except SushiError:
@@ -29,7 +30,8 @@ class MainScriptTestCase(unittest.TestCase):
         mock_object.assert_any_call('chapters', ANY)
         mock_object.assert_any_call('dst-keyframes', ANY)
         mock_object.assert_any_call('src-keyframes', ANY)
-        mock_object.assert_any_call('tcs', ANY)
+        mock_object.assert_any_call('dst-tcs', ANY)
+        mock_object.assert_any_call('src-tcs', ANY)
 
     def test_raises_on_unknown_script_type(self, ignore):
         keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.mp4']
@@ -40,7 +42,7 @@ class MainScriptTestCase(unittest.TestCase):
         self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*type.*match'), lambda: parse_args_and_run(keys))
 
     def test_raises_on_timecodes_and_fps_being_defined_together(self, ignore):
-        keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.ass', '--timecodes', 'tc.txt', '--fps', '25']
+        keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.ass', '--src-timecodes', 'tc.txt', '--src-fps', '25']
         self.assertRaisesRegexp(SushiError, self.any_case_regex(r'timecodes'), lambda: parse_args_and_run(keys))
 
 
