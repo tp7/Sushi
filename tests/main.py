@@ -3,7 +3,7 @@ import re
 import unittest
 from mock import patch, ANY
 from common import SushiError, format_time
-from sushi import parse_args_and_run, detect_groups
+from sushi import parse_args_and_run, detect_groups, interpolate_zeroes
 
 here = os.path.dirname(os.path.abspath(__file__))
 
@@ -120,3 +120,23 @@ class FormatTimeTestCase(unittest.TestCase):
 
     def test_format_100ms(self):
         self.assertEqual('0:09:05.00', format_time(544.997))
+
+
+class InterpolationTestCase(unittest.TestCase):
+    def test_returns_empty_array_when_passed_empty_array(self):
+        self.assertEquals(interpolate_zeroes([]), [])
+
+    def test_returns_false_when_no_valid_points(self):
+        self.assertFalse(interpolate_zeroes([None, 0, 0, None]))
+
+    def test_returns_full_array_when_no_zeroes(self):
+        self.assertEqual(interpolate_zeroes([1,2,3]), [1,2,3])
+
+    def test_interpolates_simple_zeroes(self):
+        self.assertEqual(interpolate_zeroes([1,0,3,0,5]), [1,2,3,4,5])
+
+    def test_interpolates_multiple_adjacent_zeroes(self):
+        self.assertEqual(interpolate_zeroes([1,0,0,0,5]), [1,2,3,4,5])
+
+    def test_copies_values_to_borders(self):
+        self.assertEqual(interpolate_zeroes([0,0,2,0,0]), [2,2,2,2,2])
