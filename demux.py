@@ -116,7 +116,7 @@ class Timecodes(object):
             return self.times[number]
         except IndexError:
             if not self.default_frame_duration:
-                raise Exception("Couldn't determine fps, broken state")
+                return self.get_frame_time(len(self.times)-1)
             if self.times:
                 return self.times[-1] + (self.default_frame_duration) * (number - len(self.times) + 1)
             else:

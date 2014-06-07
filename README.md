@@ -33,7 +33,7 @@ The minimal command line looks like this:
 ```
 python sushi.py --src hdtv.wav --dst bluray.wav --script subs.ass
 ```
-Output file name is optional - `"{destination_path}.sushi.{subtitles_format}"` is used by default. Additionalexamples can be found in the [wiki][1].
+Output file name is optional - `"{destination_path}.sushi.{subtitles_format}"` is used by default. Additional examples can be found in the [wiki][1].
 
 ### Demuxing
 Sushi can use ffmpeg to automatically demux and decode streams from video files. Add ffmpeg to your PATH or put it into the same folder as sushi for it to work. 
