@@ -178,20 +178,6 @@ def groups_from_chapters(events, times, min_auto_group_size):
     return correct_groups
 
 
-def clip_obviously_wrong(events):
-    for idx, event in enumerate(events):
-        if event.diff < MAX_REASONABLE_DIFF:  # somewhat random
-            continue
-        next_sane = next(x for x in events[idx + 1:] if x.diff < MAX_REASONABLE_DIFF)
-
-        # select the one with closest shift
-        prev_sane = events[idx - 1]  # first is never broken because it's fixed in borders routine
-        if abs_diff(prev_sane.shift, event.shift) < abs_diff(next_sane.shift, event.shift):
-            event.link_event(prev_sane)
-        else:
-            event.link_event(next_sane)
-
-
 def fix_near_borders(events, max_diff):
     def fix_border(event_list):
         broken = list(takewhile(lambda x: x.diff > max_diff, event_list))
@@ -541,7 +527,6 @@ def run(args):
         events = [x for x in script.events if not x.broken]
 
         fix_near_borders(events, MAX_REASONABLE_DIFF)
-        # clip_obviously_wrong(events)
 
         if args.grouping:
             if not ignore_chapters and chapter_times:
