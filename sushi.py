@@ -579,7 +579,7 @@ def create_arg_parser():
                         help='Split events into groups before shifting')
     parser.add_argument('--min-group-size', default=1, type=int, dest='min_group_size',
                         help='Minimum size of automatic group')
-    parser.add_argument('--max-kf-snapping', default=0.75, type=float, metavar='<frames>', dest='max_kf_snapping',
+    parser.add_argument('--max-kf-snapping', default=2, type=float, metavar='<frames>', dest='max_kf_snapping',
                         help='Maximum keyframe snapping distance [0.75]')
 
     # 10 frames at 23.976

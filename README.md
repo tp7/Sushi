@@ -27,7 +27,7 @@ After all shifts are calculated and smoothed, Sushi will try to postprocess them
 3. Destination video keyframes, using the `--dst-keyframes` argument, `XviD 2pass stat file` format.
 4. Source video keyframes, using the `--src-keyframes` argument, same format.
 
-Maximum keyframe snapping distance can be configured using the `--max-kf-snapping` argument (0.75 frames by default).
+Maximum keyframe snapping distance can be configured using the `--max-kf-snapping` argument.
 
 ### Usage
 The minimal command line looks like this:
