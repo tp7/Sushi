@@ -264,6 +264,8 @@ class Demuxer(object):
             os.remove(self._audio_output_path)
         if self._demux_subs:
             os.remove(self._script_output_path)
+        if self._make_timecodes:
+            os.remove(self._timecodes_output_path)
 
     @classmethod
     def _format_streams(cls, streams):
