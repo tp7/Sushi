@@ -319,6 +319,12 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
     last_shift = 0
 
     for idx, event in enumerate(events):
+        if event.is_comment:
+            try:
+                event.link_event(events[idx+1])
+            except IndexError:
+                event.link_event(events[idx-1])
+            continue
         if event.start > src_stream.duration_seconds:
             logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
             event.mark_broken()

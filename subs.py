@@ -86,6 +86,7 @@ class SrtEvent(ScriptEventBase):
         self.idx = int(lines[0])
         self.text = lines[2]
         self.style = None
+        self.is_comment = False
 
     @staticmethod
     def _parse_srt_time(string):
@@ -124,6 +125,7 @@ class AssEvent(ScriptEventBase):
     def __init__(self, text):
         split = text.split(':', 1)
         self.kind = split[0]
+        self.is_comment = self.kind.lower() == 'comment'
         split = [x.strip() for x in split[1].split(',', 9)]
 
         start = _parse_ass_time(split[1])
