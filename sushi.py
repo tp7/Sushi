@@ -654,3 +654,4 @@ if __name__ == '__main__':
         parse_args_and_run(sys.argv[1:])
     except SushiError as e:
         logging.critical(e.message)
+        sys.exit(2)
