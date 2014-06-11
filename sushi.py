@@ -397,8 +397,6 @@ def check_file_exists(path, file_title):
 
 
 def run(args):
-    format = "%(levelname)s: %(message)s"
-    logging.basicConfig(level=logging.DEBUG, format=format)
     ignore_chapters = args.chapters_file is not None and args.chapters_file.lower() == 'none'
 
     # first part should do all possible validation and should NOT take significant amount of time
@@ -649,6 +647,8 @@ def parse_args_and_run(cmd_keys):
 
 if __name__ == '__main__':
     try:
+        format = "%(levelname)s: %(message)s"
+        logging.basicConfig(level=logging.DEBUG, format=format)
         parse_args_and_run(sys.argv[1:])
     except SushiError as e:
         logging.critical(e.message)
