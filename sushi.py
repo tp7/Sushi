@@ -339,15 +339,11 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
 
         # assuming scripts are sorted by start time so we don't search the entire collection
         same_start = lambda x: event.start == x.start
-        try:
-            processed = next(
-                (x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end),
-                None)
+        processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end),None)
+        if processed:
             event.link_event(processed)
             # logging.debug('{0}-{1}: skipped because identical to already processed (typesetting?)'
             # .format(format_time(event.start), format_time(event.end)))
-        except StopIteration:
-            pass
 
     events = (e for e in events if not e.linked and not e.broken)
 
