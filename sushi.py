@@ -15,7 +15,7 @@ import bisect
 
 ALLOWED_ERROR = 0.01
 MAX_GROUP_STD = 0.025
-MAX_REASONABLE_DIFF = 0.5
+MAX_REASONABLE_DIFF = 0.9
 
 
 def abs_diff(a, b):
@@ -325,7 +325,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
             except IndexError:
                 event.link_event(events[idx-1])
             continue
-        if event.start > src_stream.duration_seconds:
+        if event.end > src_stream.duration_seconds:
             logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
             event.link_event(events[idx-1])
             continue
