@@ -332,9 +332,9 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
         elif event.end == event.start:
             logging.debug('{0}: skipped because zero duration'.format(format_time(event.start)))
             try:
-                event.link_event(events[idx - 1])
-            except IndexError:
                 event.link_event(events[idx + 1])
+            except IndexError:
+                event.link_event(events[idx - 1])
             continue
 
         # assuming scripts are sorted by start time so we don't search the entire collection
