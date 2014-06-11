@@ -11,22 +11,12 @@ class ScriptEventBase(object):
     def __init__(self, start, end):
         super(ScriptEventBase, self).__init__()
         self._shift = 0
-        self._broken = False
         self._diff = 1
         self.start = start
         self.end = end
         self._linked_event = None
         self._start_shift = 0
         self._end_shift = 0
-
-    def mark_broken(self):
-        if self.linked:
-            raise Exception('Cannot mark linked event as broken. This is a bug')
-        self._broken = True
-
-    @property
-    def broken(self):
-        return self._linked_event if self.linked else self._broken
 
     @property
     def shift(self):
@@ -62,7 +52,6 @@ class ScriptEventBase(object):
     def resolve_link(self):
         if not self.linked:
             raise Exception('Cannot resolve unlinked events. This is a bug')
-        self._broken = self._linked_event.broken
         self._shift = self._linked_event.shift
         self._diff = self._linked_event.diff
         self._linked_event = None

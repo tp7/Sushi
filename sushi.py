@@ -327,14 +327,14 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
             continue
         if event.start > src_stream.duration_seconds:
             logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
-            event.mark_broken()
+            event.link_event(events[idx-1])
             continue
         elif event.end == event.start:
             logging.debug('{0}: skipped because zero duration'.format(format_time(event.start)))
-            if idx == 0:
-                event.mark_broken()
-            else:
+            try:
                 event.link_event(events[idx - 1])
+            except IndexError:
+                event.link_event(events[idx + 1])
             continue
 
         # assuming scripts are sorted by start time so we don't search the entire collection
@@ -345,7 +345,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
             # logging.debug('{0}-{1}: skipped because identical to already processed (typesetting?)'
             # .format(format_time(event.start), format_time(event.end)))
 
-    events = (e for e in events if not e.linked and not e.broken)
+    events = (e for e in events if not e.linked)
 
     search_groups = merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts_distance)
 
@@ -528,7 +528,7 @@ def run(args):
                          max_ts_duration=args.max_ts_duration,
                          max_ts_distance=args.max_ts_distance)
 
-        events = [x for x in script.events if not x.broken]
+        events = script.events
 
         fix_near_borders(events, MAX_REASONABLE_DIFF)
 
