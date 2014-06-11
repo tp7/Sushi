@@ -328,12 +328,14 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
         if event.start > src_stream.duration_seconds:
             logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
             event.mark_broken()
+            continue
         elif event.end == event.start:
             logging.debug('{0}: skipped because zero duration'.format(format_time(event.start)))
             if idx == 0:
                 event.mark_broken()
             else:
                 event.link_event(events[idx - 1])
+            continue
 
         # assuming scripts are sorted by start time so we don't search the entire collection
         same_start = lambda x: event.start == x.start
