@@ -327,7 +327,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
             continue
         if event.end > src_stream.duration_seconds:
             logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
-            event.link_event(events[idx-1])
+            event.link_event(next(x for x in reversed(events[:idx]) if not x.linked))
             continue
         elif event.end == event.start:
             logging.debug('{0}: skipped because zero duration'.format(format_time(event.start)))
