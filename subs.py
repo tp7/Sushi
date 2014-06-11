@@ -47,6 +47,8 @@ class ScriptEventBase(object):
         self._end_shift = end_shift
 
     def link_event(self, other):
+        if other._linked_event is self:
+            raise Exception('Circular link detected. This is a bug')
         self._linked_event = other
 
     def resolve_link(self):
