@@ -217,5 +217,5 @@ class AssScript(ScriptBase):
                 lines.append(unicode(line))
 
         with codecs.open(path, encoding='utf-8', mode= 'w') as file:
-            file.write(u'\n'.join(lines))
+            file.write(unicode(os.linesep).join(lines))
             # print(u'\n'.join(lines))
