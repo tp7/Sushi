@@ -122,6 +122,11 @@ class Timecodes(object):
             else:
                 return number * self.default_frame_duration
 
+    def get_frame_number(self, timestamp):
+        if (not self.times or self.times[-1] < timestamp) and self.default_frame_duration:
+            return int((timestamp - sum(self.times)) / self.default_frame_duration)
+        return bisect.bisect_left(self.times, timestamp)
+
     def get_frame_size(self, timestamp):
         try:
             number = bisect.bisect_left(self.times, timestamp)
@@ -185,6 +190,9 @@ class Timecodes(object):
 
             def get_frame_size(self, timestamp):
                 return self.frame_duration
+
+            def get_frame_number(self, timestamp):
+                return int(timestamp / self.frame_duration)
 
         return CfrTimecodes(fps)
 

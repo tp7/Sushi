@@ -25,24 +25,34 @@ class CfrTimecodesTestCase(unittest.TestCase):
         self.assertAlmostEqual(1.0/23.976, t1)
         self.assertAlmostEqual(t1, t2)
 
+    def test_get_frame_number(self):
+        tcs = Timecodes.cfr(24000.0/1001.0)
+        self.assertEqual(tcs.get_frame_number(0), 0)
+        self.assertEqual(tcs.get_frame_number(1145.353), 27461)
+        self.assertEqual(tcs.get_frame_number(1001.0/24000.0 * 1234567), 1234567)
+
 
 class TimecodesTestCase(unittest.TestCase):
     def test_cfr_timecodes_v2(self):
-        text = '# timecode format v2\n' + '\n'.join(str(1000 * x / 23.976) for x in range(0, 1000))
+        text = '# timecode format v2\n' + '\n'.join(str(1000 * x / 23.976) for x in range(0, 30000))
         parsed = Timecodes.parse(text)
 
         self.assertAlmostEqual(1.0/23.976, parsed.get_frame_size(0))
         self.assertAlmostEqual(1.0/23.976, parsed.get_frame_size(25))
         self.assertAlmostEqual(1.0/23.976*100, parsed.get_frame_time(100))
         self.assertEqual(0, parsed.get_frame_time(0))
+        self.assertEqual(0, parsed.get_frame_number(0))
+        self.assertEqual(27461, parsed.get_frame_number(1145.353))
 
     def test_cfr_timecodes_v1(self):
-        text = '# timecode format v1\nAssume 23.976000'
+        text = '# timecode format v1\nAssume 23.976024'
         parsed = Timecodes.parse(text)
-        self.assertAlmostEqual(1.0/23.976, parsed.get_frame_size(0))
-        self.assertAlmostEqual(1.0/23.976, parsed.get_frame_size(25))
-        self.assertAlmostEqual(1.0/23.976*100, parsed.get_frame_time(100))
+        self.assertAlmostEqual(1.0/23.976024, parsed.get_frame_size(0))
+        self.assertAlmostEqual(1.0/23.976024, parsed.get_frame_size(25))
+        self.assertAlmostEqual(1.0/23.976024*100, parsed.get_frame_time(100))
         self.assertEqual(0, parsed.get_frame_time(0))
+        self.assertEqual(0, parsed.get_frame_number(0))
+        self.assertEqual(27461, parsed.get_frame_number(1145.353))
 
     def test_cfr_timecodes_v1_with_overrides(self):
         text = '# timecode format v1\nAssume 23.976000\n0,2000,23.976000\n3000,5000,23.976000'
@@ -91,3 +101,5 @@ class TimecodesTestCase(unittest.TestCase):
         text = '# timecode format v1\nAssume 23.976000\n0,2000,29.970000\n3000,4000,59.940000'
         parsed = Timecodes.parse(text)
         self.assertAlmostEqual(87.579, parsed.get_frame_time(number=2500), places=3)
+
+
