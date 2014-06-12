@@ -4,7 +4,7 @@ import re
 import unittest
 from mock import patch, ANY
 from common import SushiError, format_time
-from sushi import parse_args_and_run, detect_groups, interpolate_zeroes, get_distance_to_closest_kf, fix_near_borders, \
+from sushi import parse_args_and_run, detect_groups, interpolate_nones, get_distance_to_closest_kf, fix_near_borders, \
     running_median, smooth_events
 
 here = os.path.dirname(os.path.abspath(__file__))
@@ -127,22 +127,25 @@ class FormatTimeTestCase(unittest.TestCase):
 
 class InterpolationTestCase(unittest.TestCase):
     def test_returns_empty_array_when_passed_empty_array(self):
-        self.assertEquals(interpolate_zeroes([]), [])
+        self.assertEquals(interpolate_nones([],[]), [])
 
     def test_returns_false_when_no_valid_points(self):
-        self.assertFalse(interpolate_zeroes([None, 0, 0, None]))
+        self.assertFalse(interpolate_nones([None, None, None], [1,2,3]))
 
-    def test_returns_full_array_when_no_zeroes(self):
-        self.assertEqual(interpolate_zeroes([1,2,3]), [1,2,3])
+    def test_returns_full_array_when_no_nones(self):
+        self.assertEqual(interpolate_nones([1,2,3], [1,2,3]), [1,2,3])
 
-    def test_interpolates_simple_zeroes(self):
-        self.assertEqual(interpolate_zeroes([1,0,3,0,5]), [1,2,3,4,5])
+    def test_interpolates_simple_nones(self):
+        self.assertEqual(interpolate_nones([1,None,3,None,5], [1,2,3,4,5]), [1,2,3,4,5])
 
-    def test_interpolates_multiple_adjacent_zeroes(self):
-        self.assertEqual(interpolate_zeroes([1,0,0,0,5]), [1,2,3,4,5])
+    def test_interpolates_multiple_adjacent_nones(self):
+        self.assertEqual(interpolate_nones([1,None, None, None,5], [1,2,3,4,5]), [1,2,3,4,5])
 
     def test_copies_values_to_borders(self):
-        self.assertEqual(interpolate_zeroes([0,0,2,0,0]), [2,2,2,2,2])
+        self.assertEqual(interpolate_nones([None,None,2,None,None],[1,2,3,4,5]), [2,2,2,2,2])
+
+    def test_interpolates_based_on_passed_points(self):
+        self.assertEqual(interpolate_nones([1, None, 10],[1,2,10]), [1,2,10])
 
 
 class RunningMedianTestCase(unittest.TestCase):

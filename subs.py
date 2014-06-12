@@ -30,9 +30,17 @@ class ScriptEventBase(object):
     def duration(self):
         return self.end - self.start
 
+    @property
+    def shifted_end(self):
+        return self.end + self.shift + self._end_shift
+
+    @property
+    def shifted_start(self):
+        return self.start + self.shift + self._start_shift
+
     def apply_shift(self):
-        self.start += self.shift + self._start_shift
-        self.end += self.shift + self._end_shift
+        self.start = self.shifted_start
+        self.end = self.shifted_end
 
     def set_shift(self, shift, audio_diff):
         if self.linked:
@@ -40,11 +48,11 @@ class ScriptEventBase(object):
         self._shift = shift
         self._diff = audio_diff
 
-    def set_additional_shifts(self, start_shift, end_shift):
+    def adjust_additional_shifts(self, start_shift, end_shift):
         if self.linked:
             raise Exception('Cannot apply additional shifts to a linked event. This is a bug')
-        self._start_shift = start_shift
-        self._end_shift = end_shift
+        self._start_shift += start_shift
+        self._end_shift += end_shift
 
     def _get_link_chain_end(self):
         return self._linked_event._get_link_chain_end() if self.linked else self
