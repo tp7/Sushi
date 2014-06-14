@@ -80,9 +80,17 @@ class DownmixedWavFile(object):
         if self.channels_count == 1:
             return unpacked
         else:
+            def merge_channels(a, b):
+                if len(a) != len(b):
+                    logging.error("Length of audio channels didn't match. This might result in broken output")
+                    actual = min(len(a), len(b))
+                else:
+                    actual = len(a)
+                return a[:actual] + b[:actual]
+
             cc = self.channels_count
             arrays = [unpacked[i::cc] for i in range(cc)]
-            return reduce(lambda a, b: a + b, arrays) / float(cc)
+            return reduce(merge_channels, arrays) / float(cc)
 
     def _read_fmt_chunk(self, chunk):
         wFormatTag, self.channels_count, self.framerate, dwAvgBytesPerSec, wBlockAlign = struct.unpack('<HHLLH',
