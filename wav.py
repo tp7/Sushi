@@ -65,21 +65,23 @@ class DownmixedWavFile(object):
             return ''
         data = self._file.read(count * self.frame_size)
         if self.sample_width == 2:
-            unpacked = np.fromstring(data, dtype=np.uint16)
+            unpacked = np.fromstring(data, dtype=np.int16)
         elif self.sample_width == 3:
             bytes = np.ndarray(len(data), 'int8', data)
-            unpacked = np.zeros(len(data) / 3, np.uint16)
+            unpacked = np.zeros(len(data) / 3, np.int16)
             unpacked.view(dtype='int8')[0::2] = bytes[1::3]
             unpacked.view(dtype='int8')[1::2] = bytes[2::3]
         else:
             raise SushiError('Unsupported sample width: {0}'.format(self.sample_width))
+
+        unpacked = unpacked.astype('float32')
 
         if self.channels_count == 1:
             return unpacked
         else:
             cc = self.channels_count
             arrays = [unpacked[i::cc] for i in range(cc)]
-            return reduce(lambda a, b: a.astype('float32') + b.astype('float32'), arrays) / float(cc)
+            return reduce(lambda a, b: a + b, arrays) / float(cc)
 
     def _read_fmt_chunk(self, chunk):
         wFormatTag, self.channels_count, self.framerate, dwAvgBytesPerSec, wBlockAlign = struct.unpack('<HHLLH', chunk.read(14))
@@ -115,17 +117,24 @@ class WavStream(object):
             data = data.reshape((1, len(data)))
             if downsample_rate != 1:
                 data = cv2.resize(data, (new_length, 1), interpolation=cv2.INTER_NEAREST)
-
-            if sample_type == 'float32':
-                # precise but eats memory
-                arrays.append(data.astype(np.float32) / 65536.0)
-            else:
-                arrays.append(data.astype('uint16').view(dtype='uint8')[:, 1::2])
-
+            arrays.append(data)
 
             seconds_read += self.READ_CHUNK_SIZE
 
-        self.data = np.concatenate(arrays, axis=1)
+        data = np.concatenate(arrays, axis=1)
+
+        # normalizing
+        # also clipping the stream by 0.5 of max/min values to remove spikes
+        min_value = np.min(data) * 0.5
+        max_value = np.max(data) * 0.5
+
+        data = np.clip(data, min_value, max_value)
+
+        self.data = (data - min_value) / (max_value - min_value)
+
+        if sample_type == 'uint8':
+            self.data = np.round(self.data * 255.0).astype('uint8')
+
         file.close()
         logging.info('Done reading WAV {0} in {1}s'.format(path, time() - before_read))
 
