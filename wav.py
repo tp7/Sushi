@@ -10,6 +10,7 @@ from common import SushiError
 WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_EXTENSIBLE = 0xFFFE
 
+
 class DownmixedWavFile(object):
     def __init__(self, path):
         super(DownmixedWavFile, self).__init__()
@@ -84,8 +85,9 @@ class DownmixedWavFile(object):
             return reduce(lambda a, b: a + b, arrays) / float(cc)
 
     def _read_fmt_chunk(self, chunk):
-        wFormatTag, self.channels_count, self.framerate, dwAvgBytesPerSec, wBlockAlign = struct.unpack('<HHLLH', chunk.read(14))
-        if wFormatTag == WAVE_FORMAT_PCM or wFormatTag == WAVE_FORMAT_EXTENSIBLE: # ignore the rest
+        wFormatTag, self.channels_count, self.framerate, dwAvgBytesPerSec, wBlockAlign = struct.unpack('<HHLLH',
+                                                                                                       chunk.read(14))
+        if wFormatTag == WAVE_FORMAT_PCM or wFormatTag == WAVE_FORMAT_EXTENSIBLE:  # ignore the rest
             bits_per_sample = struct.unpack('<H', chunk.read(2))[0]
             self.sample_width = (bits_per_sample + 7) // 8
         else:
@@ -94,7 +96,7 @@ class DownmixedWavFile(object):
 
 
 class WavStream(object):
-    READ_CHUNK_SIZE = 1 # one second, seems to be the fastest
+    READ_CHUNK_SIZE = 1  # one second, seems to be the fastest
 
     def __init__(self, path, sample_rate=12000, sample_type='uint8'):
         if sample_type not in ('float32', 'uint8'):
@@ -111,7 +113,7 @@ class WavStream(object):
         arrays = []
         before_read = time()
         while seconds_read < total_seconds:
-            data = file.readframes(int(self.READ_CHUNK_SIZE*file.framerate))
+            data = file.readframes(int(self.READ_CHUNK_SIZE * file.framerate))
             new_length = int(round(len(data) * downsample_rate))
 
             data = data.reshape((1, len(data)))
@@ -125,8 +127,8 @@ class WavStream(object):
 
         # normalizing
         # also clipping the stream by 0.5 of max/min values to remove spikes
-        min_value = np.min(data) * 0.5
-        max_value = np.max(data) * 0.5
+        max_value = np.mean(data[data >= 0]) * 4
+        min_value = np.mean(data[data <= 0]) * 4
 
         data = np.clip(data, min_value, max_value)
 
