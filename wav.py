@@ -126,9 +126,9 @@ class WavStream(object):
         data = np.concatenate(arrays, axis=1)
 
         # normalizing
-        # also clipping the stream by 0.5 of max/min values to remove spikes
-        max_value = np.mean(data[data >= 0]) * 4
-        min_value = np.mean(data[data <= 0]) * 4
+        # also clipping the stream by 3*median value from both sides of zero
+        max_value = np.median(data[data >= 0]) * 3
+        min_value = np.median(data[data <= 0]) * 3
 
         data = np.clip(data, min_value, max_value)
 
