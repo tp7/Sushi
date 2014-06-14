@@ -13,6 +13,12 @@ import os
 from time import time
 import bisect
 
+try:
+    import matplotlib.pyplot as plt
+    plot_enabled = True
+except:
+    plot_enabled = False
+
 ALLOWED_ERROR = 0.01
 MAX_GROUP_STD = 0.025
 MAX_REASONABLE_DIFF = 0.9
@@ -328,7 +334,7 @@ def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts
 
 
 def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_ts_duration,
-                     max_ts_distance):
+                     max_ts_distance, show_plot):
     small_window = 1.5
     last_shift = 0
 
@@ -399,6 +405,9 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
             logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
                           .format(format_time(e.start), format_time(e.end), time_offset, diff))
 
+    if plot_enabled and show_plot:
+        plt.plot([x[0].shift for x in search_groups])
+        plt.show()
 
 def apply_shifts(events):
     for e in events:
@@ -538,7 +547,8 @@ def run(args):
                          chapter_times=chapter_times,
                          window=args.window,
                          max_ts_duration=args.max_ts_duration,
-                         max_ts_distance=args.max_ts_distance)
+                         max_ts_distance=args.max_ts_distance,
+                         show_plot=args.show_shift_plot)
 
         events = script.events
 
@@ -608,6 +618,7 @@ def create_arg_parser():
                         help='Maximum distance between two adjacent typesetting lines to be merged')
 
     parser.add_argument('--test-write-avs', action='store_true', dest='write_avs')
+    parser.add_argument('--test-shift-plot', action='store_true', dest='show_shift_plot')
 
     # optimizations
     parser.add_argument('--sample-rate', default=12000, type=int, metavar='<rate>', dest='sample_rate',
