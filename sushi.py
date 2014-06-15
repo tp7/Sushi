@@ -402,8 +402,8 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
 
         for e in search_group:
             e.set_shift(time_offset, diff)
-            logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
-                          .format(format_time(e.start), format_time(e.end), time_offset, diff))
+        logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
+                      .format(format_time(search_group[0].start), format_time(search_group[-1].end), time_offset, diff))
 
     if plot_enabled and show_plot:
         plt.plot([x[0].shift for x in search_groups])
