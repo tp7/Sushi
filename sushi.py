@@ -214,7 +214,7 @@ def get_distance_to_closest_kf(timestamp, keyframes):
     return kf - timestamp
 
 
-def find_keyframe_shift(group, src_keytimes, dst_keytimes, src_timecodes, dst_timecodes, max_kf_snapping):
+def find_keyframe_shift(group, src_keytimes, dst_keytimes, src_timecodes, dst_timecodes, max_kf_distance):
     def get_distance(src_distance, dst_distance, limit):
         if abs(dst_distance) > limit:
             return None
@@ -227,18 +227,18 @@ def find_keyframe_shift(group, src_keytimes, dst_keytimes, src_timecodes, dst_ti
     dst_start = get_distance_to_closest_kf(group[0].shifted_start, dst_keytimes)
     dst_end = get_distance_to_closest_kf(group[-1].shifted_end + dst_timecodes.get_frame_size(group[-1].end), dst_keytimes)
 
-    snapping_limit_start = src_timecodes.get_frame_size(group[0].start) * max_kf_snapping
-    snapping_limit_end = src_timecodes.get_frame_size(group[0].end) * max_kf_snapping
+    snapping_limit_start = src_timecodes.get_frame_size(group[0].start) * max_kf_distance
+    snapping_limit_end = src_timecodes.get_frame_size(group[0].end) * max_kf_distance
 
     return (get_distance(src_start, dst_start, snapping_limit_start),
             get_distance(src_end, dst_end, snapping_limit_end))
 
 
-def find_keyframes_distances(event, src_keytimes, dst_keytimes, timecodes, max_kf_snapping):
+def find_keyframes_distances(event, src_keytimes, dst_keytimes, timecodes, max_kf_distance):
     def find_keyframe_distance(src_time, dst_time):
         src = get_distance_to_closest_kf(src_time, src_keytimes)
         dst = get_distance_to_closest_kf(dst_time, dst_keytimes)
-        snapping_limit = timecodes.get_frame_size(src_time) * max_kf_snapping
+        snapping_limit = timecodes.get_frame_size(src_time) * max_kf_distance
 
         if abs(src) < snapping_limit and abs(dst) < snapping_limit and abs(src-dst) < snapping_limit:
             return dst - src
@@ -250,46 +250,47 @@ def find_keyframes_distances(event, src_keytimes, dst_keytimes, timecodes, max_k
 
 
 def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_distance, src_keytimes, dst_keytimes,
-                             src_timecodes, dst_timecodes, max_kf_snapping):
-    if not max_kf_snapping:
+                             src_timecodes, dst_timecodes, max_kf_distance, kf_mode):
+    if not max_kf_distance:
         return
 
     groups = merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts_distance)
-    #  step 1: snap events without changing their duration. Useful for some slight audio imprecision correction
-    shifts = []
-    times = []
-    for group in groups:
-        shifts.extend(find_keyframe_shift(group, src_keytimes, dst_keytimes, src_timecodes, dst_timecodes, max_kf_snapping))
-        times.extend((group[0].shifted_start, group[-1].shifted_end))
 
-    shifts = interpolate_nones(shifts, times)
-    if not shifts:
-        return
+    if kf_mode == 'all' or kf_mode == 'shift':
+        #  step 1: snap events without changing their duration. Useful for some slight audio imprecision correction
+        shifts = []
+        times = []
+        for group in groups:
+            shifts.extend(find_keyframe_shift(group, src_keytimes, dst_keytimes, src_timecodes, dst_timecodes, max_kf_distance))
+            times.extend((group[0].shifted_start, group[-1].shifted_end))
 
-    mean_shift = np.mean(shifts)
-    shifts = zip(*(iter(shifts), ) * 2)
+        shifts = interpolate_nones(shifts, times)
+        if shifts:
+            mean_shift = np.mean(shifts)
+            shifts = zip(*(iter(shifts), ) * 2)
 
-    logging.debug('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), mean_shift))
-    for idx, group in enumerate(groups):
-        shift = shifts[idx]
-        if abs(shift[0]-shift[1]) > 0.001 and len(group) > 1:
-            actual_shift = min(shift[0], shift[1], key=lambda x: abs(x - mean_shift))
-            logging.warning("Typesetting group at {0} had different shift at start/end points ({1} and {2}). Shifting by {3}."
-                            .format(format_time(group[0].start), shift[0], shift[1], actual_shift))
-            for e in group:
-                e.adjust_shift(actual_shift)
-        else:
-            for e in group:
-                e.adjust_additional_shifts(shift[0], shift[1])
+            logging.debug('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), mean_shift))
+            for idx, group in enumerate(groups):
+                shift = shifts[idx]
+                if abs(shift[0]-shift[1]) > 0.001 and len(group) > 1:
+                    actual_shift = min(shift[0], shift[1], key=lambda x: abs(x - mean_shift))
+                    logging.warning("Typesetting group at {0} had different shift at start/end points ({1} and {2}). Shifting by {3}."
+                                    .format(format_time(group[0].start), shift[0], shift[1], actual_shift))
+                    for e in group:
+                        e.adjust_shift(actual_shift)
+                else:
+                    for e in group:
+                        e.adjust_additional_shifts(shift[0], shift[1])
 
-    # step 2: snap start/end times separately
-    for group in groups:
-        if len(group) > 1:
-            pass  # we don't snap typesetting
-        start_shift, end_shift = find_keyframes_distances(group[0], src_keytimes, dst_keytimes, src_timecodes, max_kf_snapping)
-        if abs(start_shift) > 0.01 or abs(end_shift) > 0.01:
-            logging.debug('Snapping {0} to keyframes, start time by {1}, end: {2}'.format(format_time(group[0].start), start_shift, end_shift))
-            group[0].adjust_additional_shifts(start_shift, end_shift)
+    if kf_mode == 'all' or kf_mode == 'snap':
+        # step 2: snap start/end times separately
+        for group in groups:
+            if len(group) > 1:
+                pass  # we don't snap typesetting
+            start_shift, end_shift = find_keyframes_distances(group[0], src_keytimes, dst_keytimes, src_timecodes, max_kf_distance)
+            if abs(start_shift) > 0.01 or abs(end_shift) > 0.01:
+                logging.debug('Snapping {0} to keyframes, start time by {1}, end: {2}'.format(format_time(group[0].start), start_shift, end_shift))
+                group[0].adjust_additional_shifts(start_shift, end_shift)
 
 
 def average_shifts(events):
@@ -574,7 +575,7 @@ def run(args):
                     e.resolve_link()
                 for g in groups:
                     snap_groups_to_keyframes(g, chapter_times, args.max_ts_duration, args.max_ts_distance, src_keytimes,
-                                             dst_keytimes, src_timecodes, dst_timecodes, args.max_kf_snapping)
+                                             dst_keytimes, src_timecodes, dst_timecodes, args.max_kf_distance, args.kf_mode)
 
             if args.write_avs:
                 write_shift_avs(dst_script_path + '.avs', groups, src_audio_path, dst_audio_path)
@@ -583,7 +584,7 @@ def run(args):
             for e in (x for x in events if x.linked):
                 e.resolve_link()
             snap_groups_to_keyframes(events, chapter_times, args.max_ts_duration, args.max_ts_distance, src_keytimes,
-                                     dst_keytimes, src_timecodes, dst_timecodes, args.max_kf_snapping)
+                                     dst_keytimes, src_timecodes, dst_timecodes, args.max_kf_distance, args.kf_mode)
 
 
         apply_shifts(events)
@@ -605,8 +606,10 @@ def create_arg_parser():
                         help='Split events into groups before shifting')
     parser.add_argument('--min-group-size', default=1, type=int, dest='min_group_size',
                         help='Minimum size of automatic group')
-    parser.add_argument('--max-kf-snapping', default=2, type=float, metavar='<frames>', dest='max_kf_snapping',
+    parser.add_argument('--max-kf-distance', default=2, type=float, metavar='<frames>', dest='max_kf_distance',
                         help='Maximum keyframe snapping distance [0.75]')
+    parser.add_argument('--kf-mode', default='all', choices=['shift', 'snap', 'all'], dest='kf_mode',
+                        help='Keyframes-based shift correction/snapping mode')
 
     # 10 frames at 23.976
     parser.add_argument('--max-ts-duration', default=1001.0 / 24000.0 * 10, type=float, metavar='<seconds>',
