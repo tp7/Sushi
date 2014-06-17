@@ -175,15 +175,15 @@ class EventSmoothingTestCase(unittest.TestCase):
 
 class BorderFixingTestCase(unittest.TestCase):
     def test_propagates_last_correct_shift_to_broken_events(self):
-        events = [FakeEvent(diff=x) for x in (0.9, 0.9, 1.0, 0.4, 0.5, 0.4, 0.3, 0.9, 1.0)]
-        fix_near_borders(events, 0.6)
-        sf = events[3]
+        events = [FakeEvent(diff=x) for x in (0.9, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 1.0, 0.9)]
+        fix_near_borders(events)
+        sf = events[2]
         sl = events[-3]
-        self.assertEqual([x.linked for x in events], [sf, sf, sf, None, None, None, None, sl, sl])
+        self.assertEqual([x.linked for x in events], [sf, sf, None, None, None, None, None, sl, sl])
 
-    def test_returns_array_with_no_correct_events_unchanged(self):
+    def test_returns_array_with_no_broken_events_unchanged(self):
         events = [FakeEvent(diff=x) for x in (0.9, 0.9, 0.9, 1.0, 0.9)]
-        fix_near_borders(events, 0.6)
+        fix_near_borders(events)
         self.assertEqual([x.linked for x in events], [None, None, None, None, None])
 
 

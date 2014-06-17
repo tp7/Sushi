@@ -21,7 +21,6 @@ except:
 
 ALLOWED_ERROR = 0.01
 MAX_GROUP_STD = 0.025
-MAX_REASONABLE_DIFF = 0.9
 
 
 def abs_diff(a, b):
@@ -184,9 +183,12 @@ def groups_from_chapters(events, times, min_auto_group_size):
     return correct_groups
 
 
-def fix_near_borders(events, max_diff):
-    def fix_border(event_list):
-        broken = list(takewhile(lambda x: x.diff > max_diff, event_list))
+def fix_near_borders(events):
+    """
+    We assume that all lines with diff greater than 5 * (median diff across all events) are broken
+    """
+    def fix_border(event_list, median_diff):
+        broken = list(takewhile(lambda x: x.diff > (median_diff*5), event_list))
         if not broken:
             return
         try:
@@ -196,9 +198,9 @@ def fix_near_borders(events, max_diff):
         for x in broken:
             x.link_event(sane)
 
-
-    fix_border(events)
-    fix_border(list(reversed(events)))
+    median_diff = np.median([x.diff for x in events])
+    fix_border(events, median_diff)
+    fix_border(list(reversed(events)), median_diff)
 
 
 def get_distance_to_closest_kf(timestamp, keyframes):
@@ -335,7 +337,7 @@ def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts
 
 
 def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_ts_duration,
-                     max_ts_distance, show_plot):
+                     max_ts_distance):
     small_window = 1.5
     last_shift = 0
 
@@ -346,7 +348,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
             except IndexError:
                 event.link_event(events[idx-1])
             continue
-        if event.end > src_stream.duration_seconds:
+        if (event.start + event.duration / 2.0) > src_stream.duration_seconds:
             logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
             event.link_event(next(x for x in reversed(events[:idx]) if not x.linked))
             continue
@@ -406,9 +408,6 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
         logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
                       .format(format_time(search_group[0].start), format_time(search_group[-1].end), time_offset, diff))
 
-    if plot_enabled and show_plot:
-        plt.plot([x[0].shift for x in search_groups])
-        plt.show()
 
 def apply_shifts(events):
     for e in events:
@@ -548,12 +547,16 @@ def run(args):
                          chapter_times=chapter_times,
                          window=args.window,
                          max_ts_duration=args.max_ts_duration,
-                         max_ts_distance=args.max_ts_distance,
-                         show_plot=args.show_shift_plot)
+                         max_ts_distance=args.max_ts_distance)
 
         events = script.events
 
-        fix_near_borders(events, MAX_REASONABLE_DIFF)
+        fix_near_borders(events)
+
+        if plot_enabled and args.plot_path:
+            plt.clf()
+            plt.plot([x.shift for x in events])
+            plt.savefig(args.plot_path, dpi=300)
 
         if args.grouping:
             if not ignore_chapters and chapter_times:
@@ -621,7 +624,7 @@ def create_arg_parser():
                         help='Maximum distance between two adjacent typesetting lines to be merged')
 
     parser.add_argument('--test-write-avs', action='store_true', dest='write_avs')
-    parser.add_argument('--test-shift-plot', action='store_true', dest='show_shift_plot')
+    parser.add_argument('--test-shift-plot', default=None, dest='plot_path')
 
     # optimizations
     parser.add_argument('--sample-rate', default=12000, type=int, metavar='<rate>', dest='sample_rate',
