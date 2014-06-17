@@ -9,6 +9,9 @@ Imagine you've got a subtitle file synced to one video file, but you want to use
 
 The purpose of this script is to avoid all the hassle of manual syncing. It attempts to synchronize subtitles by finding similarities in audio streams. The script is very fast and can be used right when you want to watch something.
 
+### Downloads
+The latest binary release can always be found in the [releases][1] section. You need the green button. You need the green button on the top entry.
+
 ### How it works
 You need to provide two audio files and a subtitle file (.ass or .srt) that matches one of those files. For every line in the subtitles, the script will extract corresponding audio from the source audio stream and will try to find the closest similar pattern in the destination audio stream. The shift found will be applied to the subtitles.
 
@@ -34,7 +37,7 @@ The minimal command line looks like this:
 ```
 python sushi.py --src hdtv.wav --dst bluray.wav --script subs.ass
 ```
-Output file name is optional - `"{destination_path}.sushi.{subtitles_format}"` is used by default. Additional examples can be found in the [wiki][1].
+Output file name is optional - `"{destination_path}.sushi.{subtitles_format}"` is used by default. Additional examples can be found in the [wiki][2].
 
 ### Demuxing
 Sushi can use ffmpeg to automatically demux and decode streams from video files. Add ffmpeg to your PATH or put it into the same folder as sushi for it to work. 
@@ -61,11 +64,11 @@ After the job is done, sushi will delete all demuxed streams. To avoid this, you
 For the time being, the script is provided as-is. I don't know what exact versions you need to run it, but here's my environment:
 
 1. Windows, but it probably will run on most other operation systems
-2. [Python 2.7.6][2] (won't run on 3.x)
-3. [NumPy 1.8.1][3]
-4. [OpenCV 2.4.9][4] (putting [this file][5] in the same folder as sushi should be enough)
-5. [FFmpeg][6] (only if demuxing is used)
-6. [MkvExtract][7] (optional for faster timecodes extraction when demuxing)
+2. [Python 2.7.6][3] (won't run on 3.x)
+3. [NumPy 1.8.1][4]
+4. [OpenCV 2.4.9][5] (putting [this file][6] in the same folder as sushi should be enough)
+5. [FFmpeg][7] (only if demuxing is used)
+6. [MkvExtract][8] (optional for faster timecodes extraction when demuxing)
 
 
 ### Limitations
@@ -76,10 +79,11 @@ This script cannot improve bad timing. If original lines are mistimed, they will
 In short, while this might be safe for immediate viewing, you probably shouldn't use it to blindly shift subtitles for permanent storing.
 
 
-  [1]: https://github.com/tp7/Sushi/wiki/Examples
-  [2]: https://www.python.org/download/releases/2.7.6/
-  [3]: http://www.scipy.org/scipylib/download.html
-  [4]: http://opencv.org/
-  [5]: https://dl.dropboxusercontent.com/u/54253260/DoNotDelete/cv2.pyd
-  [6]: http://www.ffmpeg.org/download.html
-  [7]: http://www.bunkus.org/videotools/mkvtoolnix/downloads.html
+  [1]: https://github.com/tp7/Sushi/releases
+  [2]: https://github.com/tp7/Sushi/wiki/Examples
+  [3]: https://www.python.org/download/releases/2.7.6/
+  [4]: http://www.scipy.org/scipylib/download.html
+  [5]: http://opencv.org/
+  [6]: https://dl.dropboxusercontent.com/u/54253260/DoNotDelete/cv2.pyd
+  [7]: http://www.ffmpeg.org/download.html
+  [8]: http://www.bunkus.org/videotools/mkvtoolnix/downloads.html
