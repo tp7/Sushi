@@ -16,7 +16,7 @@ setup(
             'optimize': 2,
             "excludes": ["translation", "Tkconstants", "Tkinter", "tcl", 'pyreadline', 'email',
                          'numpy.core.multiarray_tests', 'numpy.core.operand_flag_tests', 'numpy.core.struct_ufunc_test',
-                         'numpy.core.umath_tests', 'numpy.core._dotblas'],
+                         'numpy.core.umath_tests', 'numpy.core._dotblas', 'matplotlib'],
             "dll_excludes": ['w9xpopen.exe', 'AVICAP32.dll', 'AVIFIL32.dll', 'MSACM32.dll', 'MSVFW32.dll'],
         }
     },
