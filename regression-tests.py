@@ -1,12 +1,16 @@
+from contextlib import contextmanager
 from json import load
 import logging
 import os
-from subprocess import Popen
 import sys
-from common import format_time
+from common import format_time, SushiError
 from subs import AssScript
 import re
+from sushi import parse_args_and_run
 
+
+console_handler = None
+root_logger = logging.getLogger('')
 
 def get_frame_number(timecode, fps):
     return int(timecode * fps)
@@ -21,7 +25,26 @@ def count_overlaps(events):
     return sum(1 for idx in xrange(1, len(events)) if events[idx].start < events[idx-1].end)
 
 
-def compare_scripts(ideal_path, test_path, fps, test_name):
+@contextmanager
+def set_file_logger(path):
+    handler = logging.FileHandler(path, mode='w')
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter('%(message)s'))
+    root_logger.addHandler(handler)
+    try:
+        yield
+    finally:
+        root_logger.removeHandler(handler)
+
+@contextmanager
+def remove_console_logger():
+    root_logger.removeHandler(console_handler)
+    try:
+        yield
+    finally:
+        root_logger.addHandler(console_handler)
+
+def compare_scripts(ideal_path, test_path, fps, test_name, expected_errors):
     ideal = AssScript(ideal_path)
     test = AssScript(test_path)
     if len(test.events) != len(ideal.events):
@@ -47,55 +70,85 @@ def compare_scripts(ideal_path, test_path, fps, test_name):
         elif i_start_frame != t_start_frame:
             logging.debug(u'{0}: start time failed at "{1}". {2} vs {3}'.format(idx, strip_tags(i.text), ft(i.start), ft(t.start)))
             failed += 1
-        else:
-            logging.debug('{0}: good line'.format(idx))
+        # else:
+        #     logging.debug('{0}: good line'.format(idx))
 
-    overlaps_before = count_overlaps(ideal.events)
-    overlaps_after = count_overlaps(test.events)
-    logging.info('Overlaps before: {0}, after: {1}, {2} new overlaps'.format(overlaps_before, overlaps_after, overlaps_after - overlaps_before))
-    if failed:
-        logging.info('Total lines: {0}, good: {1}, failed: {2}'.format(len(ideal.events), len(ideal.events)-failed, failed))
+    # overlaps_before = count_overlaps(ideal.events)
+    # overlaps_after = count_overlaps(test.events)
+    # logging.info('Overlaps before: {0}, after: {1}, {2} new overlaps'.format(overlaps_before, overlaps_after, overlaps_after - overlaps_before))
+    logging.info('Total lines: {0}, good: {1}, failed: {2}'.format(len(ideal.events), len(ideal.events)-failed, failed))
+
+
+    if failed > expected_errors:
+        logging.critical('Got more failed lines than expected ({0} actual vs {1} expected)'.format(failed, expected_errors))
+        return False
+    elif failed < expected_errors:
+        logging.critical('Got less failed lines than expected ({0} actual vs {1} expected)'.format(failed, expected_errors))
+        return False
     else:
-        logging.info('Done with no errors')
+        logging.critical('Met expectations')
+        return True
 
 
-def run_test(base_path, test_name, params):
+def run_test(base_path, plots_path, test_name, params):
     def safe_add_key(args, key, name):
         try:
             args.extend((key, str(params[name])))
         except KeyError:
             pass
 
+    def safe_add_path(args, folder, key, name):
+        try:
+            args.extend((key, os.path.join(folder, params[name])))
+        except KeyError:
+            pass
+
+    logging.info('Testing "{0}"'.format(test_name))
+
     folder = os.path.join(base_path, params['folder'])
-    dst_path = os.path.join(folder, params['dst'])
-    src_path = os.path.join(folder, params['src'])
 
-    cmd = ['py', '-2', 'sushi.py', '--src', src_path, '--dst', dst_path]
-    try:
-        cmd.extend(('--src-keyframes', os.path.join(folder, params['src-keyframes'])))
-        cmd.extend(('--dst-keyframes', os.path.join(folder, params['dst-keyframes'])))
-    except KeyError:
-        pass
+    cmd = []
 
+    safe_add_path(cmd, folder, '--src', 'src')
+    safe_add_path(cmd, folder, '--dst', 'dst')
+    safe_add_path(cmd, folder, '--src-keyframes', 'src-keyframes')
+    safe_add_path(cmd, folder, '--dst-keyframes', 'dst-keyframes')
+    safe_add_path(cmd, folder, '--src-timecodes', 'src-timecodes')
+    safe_add_path(cmd, folder, '--dst-timecodes', 'dst-timecodes')
+    safe_add_path(cmd, folder, '--script', 'script')
+    safe_add_path(cmd, folder, '--chapters', 'chapters')
     safe_add_key(cmd, '--src-script', 'src-script')
     safe_add_key(cmd, '--dst-script', 'dst-script')
-    safe_add_key(cmd, '--max-kf-snapping', 'max-kf-snapping')
+    safe_add_key(cmd, '--max-kf-distance', 'max-kf-distance')
+    safe_add_key(cmd, '--max-ts-distance', 'max-ts-distance')
+    safe_add_key(cmd, '--max-ts-duration', 'max-ts-duration')
 
-    output_path = dst_path + '.sushi.test.ass'
+    output_path = os.path.join(folder, params['dst']) + '.sushi.test.ass'
     cmd.extend(('-o', output_path))
+    if plots_path:
+        cmd.extend(('--test-shift-plot', os.path.join(plots_path, '{0}.png'.format(test_name))))
 
-    process = Popen(cmd)
-    process.wait()
-    if process.returncode != 0:
-        logging.critical('Sushi failed on test "{0}"'.format(test_name))
-        return False
+    with set_file_logger(os.path.join(folder, 'sushi_test.log')):
+        logging.debug(' '.join(cmd))
+        try:
+            with remove_console_logger():
+                parse_args_and_run(cmd)
+        except Exception as e:
+            logging.critical('Sushi failed on test "{0}": {1}'.format(test_name, e.message))
+            return False
 
-    ideal_path = os.path.join(folder, params['ideal'])
-    compare_scripts(ideal_path, output_path, params['fps'], test_name)
+        ideal_path = os.path.join(folder, params['ideal'])
+        return compare_scripts(ideal_path, output_path, params['fps'], test_name, params['expected_errors'])
 
 
 def run():
-    logging.basicConfig(level=logging.DEBUG, format='%(message)s')
+    root_logger.setLevel(logging.DEBUG)
+    global console_handler
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(logging.Formatter('%(message)s'))
+    root_logger.addHandler(console_handler)
+    failed = ran = 0
     try:
         with open('tests.json') as file:
             json = load(file)
@@ -109,10 +162,13 @@ def run():
         except KeyError:
             enabled = True
         if enabled:
-            run_test(json['basepath'], test_name, params)
+            ran += 1
+            if not run_test(json['basepath'], json['plots'], test_name, params):
+                failed += 1
+            logging.info('')
         else:
             logging.warn('Test "{0}" disabled'.format(test_name))
-
+    logging.info('Ran {0} tests, {1} failed'.format(ran, failed))
 
 
 if __name__ == '__main__':
