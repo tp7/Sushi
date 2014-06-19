@@ -1,0 +1,22 @@
+{
+    "basepath": "J:",
+    "plots": "J:\\plots",
+    "tests": {
+        "first test":{
+            "disabled": false,
+            "folder": "test1",
+            "src": "tv.wav",
+            "dst": "bd.wav",
+            "dst-keyframes": "bd.keyframes.txt",
+            "src-keyframes": "tv.keyframes.txt",
+            "dst-timecodes": "bd.timecodes.txt",
+            "src-timecodes": "tv.timecodes.txt",
+            "chapters": "tv.chapters.xml",
+            "script": "tv.ass",
+            "ideal": "ideal.ass",
+            "fps": 23.976023976023978,
+            "max-kf-distance": 3,
+            "expected_errors": 84
+        }
+    }
+}
