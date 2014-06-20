@@ -634,8 +634,8 @@ def create_arg_parser():
                         dest='max_ts_distance',
                         help='Maximum distance between two adjacent typesetting lines to be merged')
 
-    parser.add_argument('--test-write-avs', action='store_true', dest='write_avs')
-    parser.add_argument('--test-shift-plot', default=None, dest='plot_path')
+    parser.add_argument('--test-write-avs', action='store_true', dest='write_avs',help=argparse.SUPPRESS)
+    parser.add_argument('--test-shift-plot', default=None, dest='plot_path',help=argparse.SUPPRESS)
 
     # optimizations
     parser.add_argument('--sample-rate', default=12000, type=int, metavar='<rate>', dest='sample_rate',
