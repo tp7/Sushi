@@ -78,6 +78,10 @@ class ScriptEventBase(object):
             raise Exception('Cannot adjust time of linked events. This is a bug')
         self._shift += value
 
+    def __repr__(self):
+        return unicode(self)
+
+
 class ScriptBase(object):
     def sort_by_time(self):
         self.events = sorted(self.events, key=lambda x: x.start)
@@ -85,20 +89,18 @@ class ScriptBase(object):
 
 class SrtEvent(ScriptEventBase):
     def __init__(self, text):
+        parse_time = lambda x: _parse_ass_time(x.replace(',', '.'))
+
         lines = text.split('\n', 2)
         times = lines[1].split('-->')
-        start =  self._parse_srt_time(times[0].rstrip())
-        end = self._parse_srt_time(times[1].lstrip())
+        start = parse_time(times[0].rstrip())
+        end = parse_time(times[1].lstrip())
 
         super(SrtEvent, self).__init__(start, end)
         self.idx = int(lines[0])
         self.text = lines[2]
         self.style = None
         self.is_comment = False
-
-    @staticmethod
-    def _parse_srt_time(string):
-        return _parse_ass_time(string.replace(',','.'))
 
     def __unicode__(self):
         return u'{0}\n{1} --> {2}\n{3}'.format(self.idx, self._format_time(self.start),
@@ -162,9 +164,6 @@ class AssEvent(ScriptEventBase):
     @staticmethod
     def _format_time(seconds):
         return format_time(seconds)
-
-    def __repr__(self):
-        return unicode(self)
 
 
 class AssScript(ScriptBase):
