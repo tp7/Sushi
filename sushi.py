@@ -80,13 +80,13 @@ def running_median(values, window_size):
     if window_size % 2 != 1:
         raise SushiError('Median window size should be odd')
     half_window = window_size // 2
-    medians = values[:half_window]
-    for x in xrange(half_window, len(values) - half_window):
-        start = max(0, x - half_window)
-        end = x + half_window + 1
-        med = np.median([e for e in values[start:end]])
+    medians = []
+    items_count = len(values)
+    for idx in xrange(items_count):
+        radius = min(half_window, idx, items_count-idx-1)
+        med = np.median([e for e in values[idx-radius:idx+radius+1]])
         medians.append(med)
-    return medians + values[-half_window:]
+    return medians
 
 
 def smooth_events(events, window_size):
