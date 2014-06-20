@@ -602,7 +602,7 @@ def run(args):
 
         if write_plot:
             plt.plot([x.shift for x in events], label='After correction')
-            plt.legend()
+            plt.legend(fontsize=5, frameon=False, fancybox=False)
             plt.savefig(args.plot_path, dpi=300)
 
     finally:
