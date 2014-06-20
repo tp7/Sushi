@@ -421,6 +421,11 @@ def check_file_exists(path, file_title):
 
 def run(args):
     ignore_chapters = args.chapters_file is not None and args.chapters_file.lower() == 'none'
+    write_plot = plot_enabled and args.plot_path
+    if write_plot:
+        plt.clf()
+        plt.ylabel('Shift, seconds')
+        plt.xlabel('Event index')
 
     # first part should do all possible validation and should NOT take significant amount of time
     check_file_exists(args.source, 'Source')
@@ -551,12 +556,13 @@ def run(args):
 
         events = script.events
 
+        if write_plot:
+            plt.plot([x.shift for x in events], label='From audio')
+
         fix_near_borders(events)
 
-        if plot_enabled and args.plot_path:
-            plt.clf()
-            plt.plot([x.shift for x in events])
-            plt.savefig(args.plot_path, dpi=300)
+        if write_plot:
+            plt.plot([x.shift for x in events], label='Borders fixed')
 
         if args.grouping:
             if not ignore_chapters and chapter_times:
@@ -593,6 +599,11 @@ def run(args):
         apply_shifts(events)
 
         script.save_to_file(dst_script_path)
+
+        if write_plot:
+            plt.plot([x.shift for x in events], label='After correction')
+            plt.legend()
+            plt.savefig(args.plot_path, dpi=300)
 
     finally:
         if args.cleanup:
