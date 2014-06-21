@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 from common import format_time, SushiError
+from demux import Timecodes
 from subs import AssScript
 import re
 from sushi import parse_args_and_run
@@ -11,9 +12,6 @@ from sushi import parse_args_and_run
 
 console_handler = None
 root_logger = logging.getLogger('')
-
-def get_frame_number(timecode, fps):
-    return int(timecode * fps)
 
 tags_stripper = re.compile(r'{.*?}')
 
@@ -44,7 +42,7 @@ def remove_console_logger():
     finally:
         root_logger.addHandler(console_handler)
 
-def compare_scripts(ideal_path, test_path, fps, test_name, expected_errors):
+def compare_scripts(ideal_path, test_path, timecodes, test_name, expected_errors):
     ideal = AssScript(ideal_path)
     test = AssScript(test_path)
     if len(test.events) != len(ideal.events):
@@ -55,11 +53,11 @@ def compare_scripts(ideal_path, test_path, fps, test_name, expected_errors):
     failed = 0
     ft = format_time
     for idx, (i, t) in enumerate(zip(ideal.events, test.events)):
-        i_start_frame = get_frame_number(i.start, fps)
-        i_end_frame = get_frame_number(i.end, fps)
+        i_start_frame = timecodes.get_frame_number(i.start)
+        i_end_frame = timecodes.get_frame_number(i.end)
 
-        t_start_frame = get_frame_number(t.start, fps)
-        t_end_frame = get_frame_number(t.end, fps)
+        t_start_frame = timecodes.get_frame_number(t.start)
+        t_end_frame = timecodes.get_frame_number(t.end)
 
         if i_start_frame != t_start_frame and i_end_frame != t_end_frame:
             logging.debug(u'{0}: start and end time failed at "{1}". {2}-{3} vs {4}-{5}'.format(idx, strip_tags(i.text), ft(i.start), ft(i.end), ft(t.start), ft(t.end)))
@@ -70,8 +68,6 @@ def compare_scripts(ideal_path, test_path, fps, test_name, expected_errors):
         elif i_start_frame != t_start_frame:
             logging.debug(u'{0}: start time failed at "{1}". {2} vs {3}'.format(idx, strip_tags(i.text), ft(i.start), ft(t.start)))
             failed += 1
-        # else:
-        #     logging.debug('{0}: good line'.format(idx))
 
     # overlaps_before = count_overlaps(ideal.events)
     # overlaps_after = count_overlaps(test.events)
@@ -138,7 +134,12 @@ def run_test(base_path, plots_path, test_name, params):
             return False
 
         ideal_path = os.path.join(folder, params['ideal'])
-        return compare_scripts(ideal_path, output_path, params['fps'], test_name, params['expected_errors'])
+        try:
+            timecodes = Timecodes.from_file(os.path.join(folder, params['dst-timecodes']))
+        except KeyError:
+            timecodes = Timecodes.cfr(params['fps'])
+
+        return compare_scripts(ideal_path, output_path, timecodes, test_name, params['expected_errors'])
 
 
 def run():
