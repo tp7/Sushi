@@ -601,7 +601,7 @@ def run(args):
         script.save_to_file(dst_script_path)
 
         if write_plot:
-            plt.plot([x.shift for x in events], label='After correction')
+            plt.plot([x.shift + (x._start_shift + x._end_shift)/2.0 for x in events], label='After correction')
             plt.legend(fontsize=5, frameon=False, fancybox=False)
             plt.savefig(args.plot_path, dpi=300)
 
