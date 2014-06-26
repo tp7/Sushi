@@ -139,7 +139,7 @@ def detect_groups(events, min_group_size):
     return large
 
 
-def groups_from_chapters(events, times, min_auto_group_size):
+def groups_from_chapters(events, times):
     logging.debug(u'Chapter start points: {0}'.format([format_time(t) for t in times]))
     groups = [[]]
     chapter_times = iter(times[1:] + [36000000000])  # very large event at the end
@@ -153,8 +153,10 @@ def groups_from_chapters(events, times, min_auto_group_size):
 
         groups[-1].append(event)
 
-    groups = [g for g in groups if g]
+    return [g for g in groups if g]
 
+
+def split_broken_groups(groups, min_auto_group_size):
     correct_groups = []
     broken_found = False
     for g in groups:
@@ -563,14 +565,17 @@ def run(args):
 
         fix_near_borders(events)
 
-        if write_plot:
-            plt.plot([x.shift for x in events], label='Borders fixed')
-
         if args.grouping:
             if not ignore_chapters and chapter_times:
-                groups = groups_from_chapters(events, chapter_times, args.min_group_size)
+                groups = groups_from_chapters(events, chapter_times)
+                for g in groups:
+                    fix_near_borders(g)
+                groups = split_broken_groups(groups, args.min_group_size)
             else:
                 groups = detect_groups(events, args.min_group_size)
+
+            if write_plot:
+                plt.plot([x.shift for x in events], label='Borders fixed')
 
             for g in groups:
                 start_shift = g[0].shift
@@ -591,7 +596,10 @@ def run(args):
             if args.write_avs:
                 write_shift_avs(dst_script_path + '.avs', groups, src_audio_path, dst_audio_path)
 
-        elif src_keyframes:
+        elif write_plot:
+            plt.plot([x.shift for x in events], label='Borders fixed')
+
+        if not args.grouping and src_keyframes:
             for e in (x for x in events if x.linked):
                 e.resolve_link()
             snap_groups_to_keyframes(events, chapter_times, args.max_ts_duration, args.max_ts_distance, src_keytimes,
