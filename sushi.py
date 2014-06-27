@@ -97,8 +97,6 @@ def smooth_events(events, window_size):
 
 
 def detect_groups(events, min_group_size):
-    smooth_events([x for x in events if not x.linked], 7)  # smoothing events for better group detection
-
     last_shift = events[0].shift
     current_group = []
     groups = []
@@ -570,8 +568,10 @@ def run(args):
                 groups = groups_from_chapters(events, chapter_times)
                 for g in groups:
                     fix_near_borders(g)
+                    smooth_events([x for x in g if not x.linked], 7)
                 groups = split_broken_groups(groups, args.min_group_size)
             else:
+                smooth_events([x for x in events if not x.linked], 7)
                 groups = detect_groups(events, args.min_group_size)
 
             if write_plot:
