@@ -89,7 +89,10 @@ def running_median(values, window_size):
     return medians
 
 
-def smooth_events(events, window_size):
+def smooth_events(events, radius):
+    if not radius:
+        return
+    window_size = radius*2+1
     shifts = [e.shift for e in events]
     smoothed = running_median(shifts, window_size)
     for i, e in enumerate(events):
@@ -568,10 +571,10 @@ def run(args):
                 groups = groups_from_chapters(events, chapter_times)
                 for g in groups:
                     fix_near_borders(g)
-                    smooth_events([x for x in g if not x.linked], 7)
+                    smooth_events([x for x in g if not x.linked], args.smooth_radius)
                 groups = split_broken_groups(groups, args.min_group_size)
             else:
-                smooth_events([x for x in events if not x.linked], 7)
+                smooth_events([x for x in events if not x.linked], args.smooth_radius)
                 groups = detect_groups(events, args.min_group_size)
 
             if write_plot:
@@ -634,6 +637,8 @@ def create_arg_parser():
                         help='Maximum keyframe snapping distance [0.75]')
     parser.add_argument('--kf-mode', default='all', choices=['shift', 'snap', 'all'], dest='kf_mode',
                         help='Keyframes-based shift correction/snapping mode')
+    parser.add_argument('--smooth-radius', default=3, type=int, dest='smooth_radius',
+                        help='Radius of smoothing median filter')
 
     # 10 frames at 23.976
     parser.add_argument('--max-ts-duration', default=1001.0 / 24000.0 * 10, type=float, metavar='<seconds>',
