@@ -117,35 +117,39 @@ class WavStream(object):
         self.sample_count = int(total_seconds * sample_rate)
         self.sample_rate = sample_rate
 
-        seconds_read = 0
-        arrays = []
         before_read = time()
-        while seconds_read < total_seconds:
-            data = file.readframes(int(self.READ_CHUNK_SIZE * file.framerate))
-            new_length = int(round(len(data) * downsample_rate))
+        try:
+            seconds_read = 0
+            arrays = []
+            while seconds_read < total_seconds:
+                data = file.readframes(int(self.READ_CHUNK_SIZE * file.framerate))
+                new_length = int(round(len(data) * downsample_rate))
 
-            data = data.reshape((1, len(data)))
-            if downsample_rate != 1:
-                data = cv2.resize(data, (new_length, 1), interpolation=cv2.INTER_NEAREST)
-            arrays.append(data)
+                data = data.reshape((1, len(data)))
+                if downsample_rate != 1:
+                    data = cv2.resize(data, (new_length, 1), interpolation=cv2.INTER_NEAREST)
+                arrays.append(data)
 
-            seconds_read += self.READ_CHUNK_SIZE
+                seconds_read += self.READ_CHUNK_SIZE
 
-        data = np.concatenate(arrays, axis=1)
+            data = np.concatenate(arrays, axis=1)
 
-        # normalizing
-        # also clipping the stream by 3*median value from both sides of zero
-        max_value = np.median(data[data >= 0]) * 3
-        min_value = np.median(data[data <= 0]) * 3
+            # normalizing
+            # also clipping the stream by 3*median value from both sides of zero
+            max_value = np.median(data[data >= 0]) * 3
+            min_value = np.median(data[data <= 0]) * 3
 
-        data = np.clip(data, min_value, max_value)
+            data = np.clip(data, min_value, max_value)
 
-        self.data = (data - min_value) / (max_value - min_value)
+            self.data = (data - min_value) / (max_value - min_value)
 
-        if sample_type == 'uint8':
-            self.data = np.round(self.data * 255.0).astype('uint8')
+            if sample_type == 'uint8':
+                self.data = np.round(self.data * 255.0).astype('uint8')
 
-        file.close()
+        except Exception as e:
+            raise SushiError('Error while loading {0}: {1}'.format(path, e))
+        finally:
+            file.close()
         logging.info('Done reading WAV {0} in {1}s'.format(path, time() - before_read))
 
     @property
