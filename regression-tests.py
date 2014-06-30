@@ -156,7 +156,15 @@ def run():
     except IOError as e:
         logging.critical(e)
         sys.exit(2)
+
+    try:
+        run_only = json['run-only']
+    except KeyError:
+        run_only = None
+
     for test_name in json['tests']:
+        if run_only and test_name not in run_only:
+            continue
         params = json['tests'][test_name]
         try:
             enabled = not params['disabled']
