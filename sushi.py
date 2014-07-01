@@ -437,12 +437,14 @@ def run(args):
     check_file_exists(args.destination, 'Destination')
     check_file_exists(args.src_timecodes, 'Source timecodes')
     check_file_exists(args.dst_timecodes, 'Source timecodes')
-    check_file_exists(args.src_keyframes, 'Source keyframes')
-    check_file_exists(args.dst_keyframes, 'Destination keyframes')
     check_file_exists(args.script_file, 'Script')
 
     if not ignore_chapters:
         check_file_exists(args.chapters_file, 'Chapters')
+    if args.src_keyframes not in ('auto', 'make'):
+        check_file_exists(args.src_keyframes, 'Source keyframes')
+    if args.dst_keyframes not in ('auto', 'make'):
+        check_file_exists(args.dst_keyframes, 'Destination keyframes')
 
     if (args.src_timecodes and args.src_fps) or (args.dst_timecodes and args.dst_fps):
         raise SushiError('Both fps and timecodes file cannot be specified at the same time')
@@ -508,11 +510,14 @@ def run(args):
 
     # selecting keyframes and timecodes
     if args.src_keyframes:
-        def load_keyframes(kf_path):
-            src_keyframes = parse_keyframes(kf_path)
-            if not src_keyframes:
-                raise SushiError('No keyframes found in {0}'.format(kf_path))
-            return src_keyframes
+        def select_keyframes(file_arg, demuxer):
+            auto_file = demuxer.path + '.sushi.keyframes.txt'
+            if file_arg in ('auto', 'make'):
+                if file_arg == 'make' or not os.path.exists(auto_file):
+                    demuxer.set_keyframes(output_path = auto_file)
+                return auto_file
+            else:
+                return file_arg
 
         def select_timecodes(external_file, fps_arg, demuxer):
             if external_file:
@@ -526,13 +531,10 @@ def run(args):
             else:
                 raise SushiError('Fps, timecodes or video files must be provided if keyframes are used')
 
-        src_keyframes = load_keyframes(args.src_keyframes)
-        dst_keyframes = load_keyframes(args.dst_keyframes)
+        src_keyframes_file = select_keyframes(args.src_keyframes, src_demuxer)
+        dst_keyframes_file = select_keyframes(args.dst_keyframes, dst_demuxer)
         src_timecodes_file = select_timecodes(args.src_timecodes, args.src_fps, src_demuxer)
         dst_timecodes_file = select_timecodes(args.dst_timecodes, args.dst_fps, dst_demuxer)
-    else:
-        src_keyframes = None
-        dst_keyframes = None
 
     # after this point nothing should fail so it's safe to start slow operations
     # like running the actual demuxing
@@ -540,12 +542,12 @@ def run(args):
     dst_demuxer.demux()
 
     try:
-        if src_keyframes:
+        if args.src_keyframes:
             src_timecodes = Timecodes.cfr(args.src_fps) if args.src_fps else Timecodes.from_file(src_timecodes_file)
-            src_keytimes = [src_timecodes.get_frame_time(f) for f in src_keyframes]
+            src_keytimes = [src_timecodes.get_frame_time(f) for f in parse_keyframes(src_keyframes_file)]
 
             dst_timecodes = Timecodes.cfr(args.dst_fps) if args.dst_fps else Timecodes.from_file(dst_timecodes_file)
-            dst_keytimes = [dst_timecodes.get_frame_time(f) for f in dst_keyframes]
+            dst_keytimes = [dst_timecodes.get_frame_time(f) for f in parse_keyframes(dst_keyframes_file)]
 
         script = AssScript(src_script_path) if script_extension == '.ass' else SrtScript(src_script_path)
         script.sort_by_time()
@@ -589,7 +591,7 @@ def run(args):
                              .format(format_time(g[0].start), format_time(g[-1].end), len(g), start_shift, end_shift,
                                      avg_shift))
 
-            if src_keyframes:
+            if args.src_keyframes:
                 for e in (x for x in events if x.linked):
                     e.resolve_link()
                 for g in groups:
@@ -602,7 +604,7 @@ def run(args):
         elif write_plot:
             plt.plot([x.shift for x in events], label='Borders fixed')
 
-        if not args.grouping and src_keyframes:
+        if not args.grouping and args.src_keyframes:
             for e in (x for x in events if x.linked):
                 e.resolve_link()
             snap_groups_to_keyframes(events, chapter_times, args.max_ts_duration, args.max_ts_distance, src_keytimes,

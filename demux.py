@@ -238,6 +238,10 @@ class Demuxer(object):
         self._timecodes_output_path = output_path
         self._make_timecodes = True
 
+    def set_keyframes(self, output_path):
+        self._keyframes_output_path = output_path
+        self._make_keyframes = True
+
     def get_subs_type(self, stream_idx):
         return self._select_stream(self._mi.subtitles, stream_idx, 'subtitles').type
 
