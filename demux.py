@@ -104,6 +104,29 @@ class MkvToolnix(object):
         process = Popen(args)
         process.wait()
 
+class SCXviD(object):
+    @classmethod
+    def make_keyframes(cls, video_path, log_path):
+        try:
+            ffmpeg_process = Popen(['ffmpeg', '-i', video_path,
+                            '-f', 'yuv4mpegpipe',
+                            '-vf', 'scale=640:360',
+                            '-pix_fmt', 'yuv420p',
+                            '-vsync', 'drop', '-'], stdout=PIPE)
+        except OSError as e:
+            if e.errno == 2:
+                raise SushiError("Couldn't invoke ffmpeg, check that it's installed")
+            raise
+
+        try:
+            scxvid_process = Popen(['SCXvid.exe', log_path], stdin=ffmpeg_process.stdout)
+        except OSError as e:
+            ffmpeg_process.kill()
+            if e.errno == 2:
+                raise SushiError("Couldn't invoke scxvid, check that it's installed")
+            raise
+        scxvid_process.wait()
+
 
 class Timecodes(object):
     def __init__(self, times, default_fps):
@@ -246,6 +269,9 @@ class Demuxer(object):
         return self._select_stream(self._mi.subtitles, stream_idx, 'subtitles').type
 
     def demux(self):
+        if self._make_keyframes:
+            SCXviD.make_keyframes(self._path, self._keyframes_output_path)
+
         ffargs = {}
         if self._demux_audio:
             ffargs['audio_stream'] = self._audio_stream.id
