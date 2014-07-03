@@ -514,7 +514,10 @@ def run(args):
             auto_file = demuxer.path + '.sushi.keyframes.txt'
             if file_arg in ('auto', 'make'):
                 if file_arg == 'make' or not os.path.exists(auto_file):
-                    demuxer.set_keyframes(output_path = auto_file)
+                    if not demuxer.has_video:
+                        raise SushiError("Cannot make keyframes for {0} because it doesn't have any video!"
+                                         .format(demuxer.path))
+                    demuxer.set_keyframes(output_path=auto_file)
                 return auto_file
             else:
                 return file_arg
