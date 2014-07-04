@@ -281,18 +281,23 @@ class Demuxer(object):
             ffargs['script_stream'] = self._script_stream.id
             ffargs['script_path'] = self._script_output_path
 
-        if self._make_timecodes and get_extension(self._path).lower() == '.mkv':
-            try:
-                MkvToolnix.extract_timecodes(self._path,
-                                             stream_idx=self._mi.video[0].id,
-                                             output_path=self._timecodes_output_path)
-            except OSError as e:
-                if e.errno == 2:
-                    # mkvextract not found, use ffmpeg
-                    ffargs['video_stream'] = self._mi.video[0].id
-                    ffargs['timecodes_path'] = self._timecodes_output_path
-                else:
-                    raise
+        if self._make_timecodes:
+            def set_ffmpeg_timecodes():
+                ffargs['video_stream'] = self._mi.video[0].id
+                ffargs['timecodes_path'] = self._timecodes_output_path
+
+            if get_extension(self._path).lower() == '.mkv':
+                try:
+                    MkvToolnix.extract_timecodes(self._path,
+                                                 stream_idx=self._mi.video[0].id,
+                                                 output_path=self._timecodes_output_path)
+                except OSError as e:
+                    if e.errno == 2:
+                        set_ffmpeg_timecodes()
+                    else:
+                        raise
+            else:
+                set_ffmpeg_timecodes()
 
         if ffargs:
             FFmpeg.demux_file(self._path, **ffargs)
