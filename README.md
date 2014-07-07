@@ -62,6 +62,7 @@ For the time being, the script is provided as-is. I don't know what exact versio
 4. [OpenCV 2.4.9][6] (putting [this file][7] in the same folder as sushi should be enough)
 5. [FFmpeg][8] (only if demuxing is used)
 6. [MkvExtract][9] (optional for faster timecodes extraction when demuxing)
+7. [SCXvid-standalone][10] (only if keyframes are made by sushi)
 
 
 ### Limitations
@@ -81,3 +82,4 @@ In short, while this might be safe for immediate viewing, you probably shouldn't
   [7]: https://dl.dropboxusercontent.com/u/54253260/DoNotDelete/cv2.pyd
   [8]: http://www.ffmpeg.org/download.html
   [9]: http://www.bunkus.org/videotools/mkvtoolnix/downloads.html
+  [10]: https://github.com/soyokaze/SCXvid-standalone/releases
