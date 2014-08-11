@@ -393,6 +393,14 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
         original_time = search_group[0].start
         start_point = original_time + last_shift
 
+        # make sure we don't crash because lines aren't present in the destination stream
+        if start_point > dst_stream.duration_seconds:
+            logging.info('Search start point is larger than dst stream duration, ignoring: %s' % unicode(search_group[0]))
+            link_to = next(x for x in reversed(search_groups[:idx]) if not x[-1].linked)[-1]
+            for e in search_group:
+                e.link_event(link_to)
+            continue
+
         # searching with smaller window
         diff = new_time = None
         if small_window < window:
