@@ -70,7 +70,7 @@ def interpolate_nones(data, points):
     out = iter(np.interp(zero_idx, data_idx, data_values))
 
     for point, value in enumerate(data):
-        if not value:
+        if value is None:
             data[point] = next(out, None)
 
     return data
