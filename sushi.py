@@ -192,20 +192,26 @@ def fix_near_borders(events):
     """
     def fix_border(event_list, median_diff):
         last_ten_diff = np.median([x.diff for x in event_list[:10]])
-        broken = list(takewhile(lambda x: x.diff > (min(last_ten_diff, median_diff)*5), event_list))
-        if not broken:
-            return 0
-        try:
-            sane = event_list[len(broken)]
-        except IndexError:
-            return 0
-        for x in broken:
-            x.link_event(sane)
-        return len(broken)
+        diff_limit = min(last_ten_diff, median_diff)*5
+        broken = []
+        for event in event_list:
+            if event.diff > diff_limit:
+                broken.append(event)
+            else:
+                for x in broken:
+                    x.link_event(event)
+                return len(broken)
+        return 0
 
     median_diff = np.median([x.diff for x in events])
-    logging.debug('Fixing {0} events near start'.format(fix_border(events, median_diff)))
-    logging.debug('Fixing {0} events near end'.format(fix_border(list(reversed(events)), median_diff)))
+
+    fixed_count = fix_border(events, median_diff)
+    if fixed_count:
+        logging.debug('Fixing {0} events near start'.format(fixed_count))
+
+    fixed_count = fix_border(list(reversed(events)), median_diff)
+    if fixed_count:
+        logging.debug('Fixing {0} events near end'.format(fixed_count))
 
 
 def get_distance_to_closest_kf(timestamp, keyframes):
