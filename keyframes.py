@@ -1,12 +1,11 @@
-from common import SushiError
+from common import SushiError, read_all_text
 
 
 def parse_scxvid_keyframes(text):
     return [i-3 for i,line in enumerate(text.splitlines()) if line and line[0] == 'i']
 
 def parse_keyframes(path):
-    with open(path) as file:
-        text = file.read()
+    text = read_all_text(path)
     if text.find('# XviD 2pass stat file')>=0:
         frames = parse_scxvid_keyframes(text)
     else:

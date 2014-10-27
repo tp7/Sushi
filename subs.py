@@ -84,7 +84,7 @@ class ScriptEventBase(object):
 
 class ScriptBase(object):
     def sort_by_time(self):
-        self.events = sorted(self.events, key=lambda x: x.start)
+        self.events.sort(key=lambda x: x.start)
 
 
 class SrtEvent(ScriptEventBase):
@@ -206,15 +206,13 @@ class AssScript(ScriptBase):
         lines = []
         if self.script_info:
             lines.append(u'[Script Info]')
-            for line in self.script_info:
-                lines.append(line)
+            lines.extend(self.script_info)
             lines.append('')
 
         if self.styles:
             lines.append(u'[V4+ Styles]')
             lines.append(u'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding')
-            for line in self.styles:
-                lines.append(line)
+            lines.extend(self.styles)
             lines.append('')
 
         if self.events:

@@ -63,10 +63,10 @@ def interpolate_nones(data, points):
     data_idx = [point for point, value in zip(points, data) if value is not None]
     if not data_idx:
         return []
-    data_values = [value for value in data if value is not None]
     zero_idx = [point for point, value in zip(points, data) if value is None]
     if not zero_idx:
         return data
+    data_values = [value for value in data if value is not None]
     out = iter(np.interp(zero_idx, data_idx, data_values))
 
     for point, value in enumerate(data):
@@ -95,8 +95,8 @@ def smooth_events(events, radius):
     window_size = radius*2+1
     shifts = [e.shift for e in events]
     smoothed = running_median(shifts, window_size)
-    for i, e in enumerate(events):
-        e.set_shift(smoothed[i], e.diff)
+    for event, new_shift in zip(events, smoothed):
+        event.set_shift(new_shift, event.diff)
 
 
 def detect_groups(events, min_group_size):
@@ -172,7 +172,7 @@ def split_broken_groups(groups, min_auto_group_size):
             correct_groups.append(g)
 
     if broken_found:
-        correct_groups = sorted(correct_groups, key=lambda g: g[0].start)
+        correct_groups.sort(key=lambda g: g[0].start)
 
         i = 0
         while i < len(correct_groups) - 1:
@@ -283,8 +283,7 @@ def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_dist
             shifts = zip(*(iter(shifts), ) * 2)
 
             logging.debug('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), mean_shift))
-            for idx, group in enumerate(groups):
-                shift = shifts[idx]
+            for group, shift in zip(groups, shifts):
                 if abs(shift[0]-shift[1]) > 0.001 and len(group) > 1:
                     actual_shift = min(shift[0], shift[1], key=lambda x: abs(x - mean_shift))
                     logging.warning("Typesetting group at {0} had different shift at start/end points ({1} and {2}). Shifting by {3}."
