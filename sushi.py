@@ -498,7 +498,7 @@ def run(args):
         src_demuxer.set_script(stream_idx=args.src_script_idx, output_path=src_script_path)
 
     script_extension = get_extension(src_script_path)
-    if script_extension not in ('.ass', '.src'):
+    if script_extension not in ('.ass', '.srt'):
         raise SushiError('Unknown script type')
 
     # selection destination subtitles
