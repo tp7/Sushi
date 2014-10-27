@@ -585,8 +585,6 @@ def run(args):
         if write_plot:
             plt.plot([x.shift for x in events], label='From audio')
 
-        fix_near_borders(events)
-
         if args.grouping:
             if not ignore_chapters and chapter_times:
                 groups = groups_from_chapters(events, chapter_times)
@@ -595,6 +593,7 @@ def run(args):
                     smooth_events([x for x in g if not x.linked], args.smooth_radius)
                 groups = split_broken_groups(groups, args.min_group_size)
             else:
+                fix_near_borders(events)
                 smooth_events([x for x in events if not x.linked], args.smooth_radius)
                 groups = detect_groups(events, args.min_group_size)
 
@@ -619,9 +618,10 @@ def run(args):
 
             if args.write_avs:
                 write_shift_avs(dst_script_path + '.avs', groups, src_audio_path, dst_audio_path)
-
-        elif write_plot:
-            plt.plot([x.shift for x in events], label='Borders fixed')
+        else:
+            fix_near_borders(events)
+            if write_plot:
+                plt.plot([x.shift for x in events], label='Borders fixed')
 
         if not args.grouping and args.src_keyframes:
             for e in (x for x in events if x.linked):
