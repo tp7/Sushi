@@ -108,12 +108,12 @@ class SrtEvent(ScriptEventBase):
 
     @staticmethod
     def _format_time(seconds):
-        cs = round(seconds * 100)
+        cs = round(seconds * 1000)
         return u'{0:02d}:{1:02d}:{2:02d},{3:03d}'.format(
-            int(cs // 360000),
-            int((cs // 6000) % 60),
-            int((cs // 100) % 60),
-            int(cs % 100))
+            int(cs // 3600000),
+            int((cs // 60000) % 60),
+            int((cs // 1000) % 60),
+            int(cs % 1000))
 
 
 class SrtScript(ScriptBase):
