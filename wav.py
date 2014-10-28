@@ -131,20 +131,21 @@ class WavStream(object):
 
                 seconds_read += self.READ_CHUNK_SIZE
 
-            data = np.concatenate(arrays, axis=1)
+            self.data = np.concatenate(arrays, axis=1)
 
             # normalizing
             # also clipping the stream by 3*median value from both sides of zero
-            max_value = np.median(data[data >= 0], overwrite_input=True) * 3
-            min_value = np.median(data[data <= 0], overwrite_input=True) * 3
+            max_value = np.median(self.data[self.data >= 0], overwrite_input=True) * 3
+            min_value = np.median(self.data[self.data <= 0], overwrite_input=True) * 3
 
-            np.clip(data, min_value, max_value, out=data)
+            np.clip(self.data, min_value, max_value, out=self.data)
 
-            data -= min_value
-            self.data = data  / (max_value - min_value)
+            self.data -= min_value
+            self.data /= (max_value - min_value)
 
             if sample_type == 'uint8':
-                np.round(self.data * 255.0, out=self.data)
+                self.data *= 255.0
+                self.data += 0.5
                 self.data = self.data.astype('uint8')
 
         except Exception as e:
