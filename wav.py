@@ -61,7 +61,6 @@ class DownmixedWavFile(object):
             self._file = None
 
     def readframes(self, count):
-        # always reads formats as unsigned to increase sample values range for better matching
         if not count:
             return ''
         data = self._file.read(count * self.frame_size)
@@ -136,15 +135,17 @@ class WavStream(object):
 
             # normalizing
             # also clipping the stream by 3*median value from both sides of zero
-            max_value = np.median(data[data >= 0]) * 3
-            min_value = np.median(data[data <= 0]) * 3
+            max_value = np.median(data[data >= 0], overwrite_input=True) * 3
+            min_value = np.median(data[data <= 0], overwrite_input=True) * 3
 
-            data = np.clip(data, min_value, max_value)
+            np.clip(data, min_value, max_value, out=data)
 
-            self.data = (data - min_value) / (max_value - min_value)
+            data -= min_value
+            self.data = data  / (max_value - min_value)
 
             if sample_type == 'uint8':
-                self.data = np.round(self.data * 255.0).astype('uint8')
+                np.round(self.data * 255.0, out=self.data)
+                self.data = self.data.astype('uint8')
 
         except Exception as e:
             raise SushiError('Error while loading {0}: {1}'.format(path, e))
