@@ -84,7 +84,7 @@ def running_median(values, window_size):
     items_count = len(values)
     for idx in xrange(items_count):
         radius = min(half_window, idx, items_count-idx-1)
-        med = np.median([e for e in values[idx-radius:idx+radius+1]])
+        med = np.median(values[idx-radius:idx+radius+1])
         medians.append(med)
     return medians
 
@@ -191,7 +191,7 @@ def fix_near_borders(events):
     We assume that all lines with diff greater than 5 * (median diff across all events) are broken
     """
     def fix_border(event_list, median_diff):
-        last_ten_diff = np.median([x.diff for x in event_list[:10]])
+        last_ten_diff = np.median([x.diff for x in event_list[:10]], overwrite_input=True)
         diff_limit = min(last_ten_diff, median_diff)*5
         broken = []
         for event in event_list:
@@ -203,7 +203,7 @@ def fix_near_borders(events):
                 return len(broken)
         return 0
 
-    median_diff = np.median([x.diff for x in events])
+    median_diff = np.median([x.diff for x in events], overwrite_input=True)
 
     fixed_count = fix_border(events, median_diff)
     if fixed_count:
