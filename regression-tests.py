@@ -87,12 +87,6 @@ def compare_scripts(ideal_path, test_path, timecodes, test_name, expected_errors
 
 
 def run_test(base_path, plots_path, test_name, params):
-    def safe_add_key(args, key, name):
-        try:
-            args.extend((key, str(params[name])))
-        except KeyError:
-            pass
-
     def safe_add_path(args, folder, key, name):
         try:
             args.extend((key, os.path.join(folder, params[name])))
@@ -113,11 +107,11 @@ def run_test(base_path, plots_path, test_name, params):
     safe_add_path(cmd, folder, '--dst-timecodes', 'dst-timecodes')
     safe_add_path(cmd, folder, '--script', 'script')
     safe_add_path(cmd, folder, '--chapters', 'chapters')
-    safe_add_key(cmd, '--src-script', 'src-script')
-    safe_add_key(cmd, '--dst-script', 'dst-script')
-    safe_add_key(cmd, '--max-kf-distance', 'max-kf-distance')
-    safe_add_key(cmd, '--max-ts-distance', 'max-ts-distance')
-    safe_add_key(cmd, '--max-ts-duration', 'max-ts-duration')
+    safe_add_path(cmd, folder, '--src-script', 'src-script')
+    safe_add_path(cmd, folder, '--dst-script', 'dst-script')
+    safe_add_path(cmd, folder, '--max-kf-distance', 'max-kf-distance')
+    safe_add_path(cmd, folder, '--max-ts-distance', 'max-ts-distance')
+    safe_add_path(cmd, folder, '--max-ts-duration', 'max-ts-duration')
 
     output_path = os.path.join(folder, params['dst']) + '.sushi.test.ass'
     cmd.extend(('-o', output_path))
