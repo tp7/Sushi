@@ -5,15 +5,17 @@ import unittest
 from mock import patch, ANY
 from common import SushiError, format_time
 from sushi import parse_args_and_run, detect_groups, interpolate_nones, get_distance_to_closest_kf, fix_near_borders, \
-    running_median, smooth_events
+    running_median, smooth_events, groups_from_chapters
 
 here = os.path.dirname(os.path.abspath(__file__))
 
 class FakeEvent(object):
-    def __init__(self, shift=0.0, diff=0.0):
+    def __init__(self, shift=0.0, diff=0.0, end=0.0, start=0.0):
         self.shift = shift
         self.linked = None
         self.diff = diff
+        self.start = start
+        self.end = end
 
     def set_shift(self, shift, diff):
         self.shift = shift
@@ -61,51 +63,72 @@ class MainScriptTestCase(unittest.TestCase):
         self.assertRaisesRegexp(SushiError, self.any_case_regex(r'timecodes'), lambda: parse_args_and_run(keys))
 
 
-class GroupSplittingTestCase(unittest.TestCase):
-    def event(self, shift):
-        return FakeEvent(shift)
-
+class DetectGroupsTestCase(unittest.TestCase):
     def test_splits_three_simple_groups(self):
-        events = [self.event(0.5)] * 3 + [self.event(1.0)] * 10 + [self.event(0.5)]*5
+        events = [FakeEvent(0.5)] * 3 + [FakeEvent(1.0)] * 10 + [FakeEvent(0.5)]*5
         groups = detect_groups(events, min_group_size=1)
         self.assertEqual(3, len(groups[0]))
         self.assertEqual(10, len(groups[1]))
         self.assertEqual(5, len(groups[2]))
 
     def test_single_group_for_all_events(self):
-        events = [self.event(0.5)] * 10
+        events = [FakeEvent(0.5)] * 10
         groups = detect_groups(events, min_group_size=1)
         self.assertEqual(10, len(groups[0]))
 
     def test_merges_small_groups_with_closest_large(self):
-        events = [self.event(0.5)]*10 + [self.event(0.8)] + [self.event(1.0)] * 10
+        events = [FakeEvent(0.5)]*10 + [FakeEvent(0.8)] + [FakeEvent(1.0)] * 10
         groups = detect_groups(events, min_group_size=5)
         self.assertEqual(10, len(groups[0]))
         self.assertEqual(11, len(groups[1]))
 
     def test_merges_two_consecutive_small_groups_with_closest_large(self):
-        events = [self.event(0.5)]*20 + [self.event(0.9)]*10 + [self.event(0.7)]*10 + [self.event(1.0)] * 20
+        events = [FakeEvent(0.5)]*20 + [FakeEvent(0.9)]*10 + [FakeEvent(0.7)]*10 + [FakeEvent(1.0)] * 20
         groups = detect_groups(events, min_group_size=15)
         self.assertEqual(20, len(groups[0]))
         self.assertEqual(40, len(groups[1]))
 
     def test_merges_small_first_group_property(self):
-        events = [self.event(0.5)] + [self.event(10)] * 10 + [self.event(5)] * 10
+        events = [FakeEvent(0.5)] + [FakeEvent(10)] * 10 + [FakeEvent(5)] * 10
         groups = detect_groups(events, min_group_size=5)
         self.assertEqual(11, len(groups[0]))
         self.assertEqual(10, len(groups[1]))
 
     def test_merges_small_last_group_property(self):
-        events = [self.event(0.5)]*10 + [self.event(10)] * 10 + [self.event(5)]
+        events = [FakeEvent(0.5)]*10 + [FakeEvent(10)] * 10 + [FakeEvent(5)]
         groups = detect_groups(events, min_group_size=5)
         self.assertEqual(10, len(groups[0]))
         self.assertEqual(11, len(groups[1]))
 
     def test_does_nothing_when_there_is_only_wrong_groups(self):
-        events = [self.event(0.5)]*2 + [self.event(10)] * 3
+        events = [FakeEvent(0.5)]*2 + [FakeEvent(10)] * 3
         groups = detect_groups(events, min_group_size=5)
         self.assertEqual(2, len(groups[0]))
         self.assertEqual(3, len(groups[1]))
+
+
+class GroupsFromChaptersTestCase(unittest.TestCase):
+    def test_all_events_in_one_group_when_no_chapters(self):
+        events = [FakeEvent(end=1),FakeEvent(end=2),FakeEvent(end=3)]
+        groups = groups_from_chapters(events, [])
+        self.assertEqual(1, len(groups))
+        self.assertEqual(events, groups[0])
+
+    def test_events_in_two_groups_one_chapter(self):
+        events = [FakeEvent(end=1),FakeEvent(end=2),FakeEvent(end=3)]
+        groups = groups_from_chapters(events, [0.0, 1.5])
+        self.assertEqual(2, len(groups))
+        self.assertItemsEqual([events[0]], groups[0])
+        self.assertItemsEqual([events[1], events[2]], groups[1])
+
+    def test_multiple_groups_multiple_chapters(self):
+        events = [FakeEvent(end=x) for x in xrange(1, 10)]
+        groups = groups_from_chapters(events, [0.0, 3.2, 4.4, 7.7])
+        self.assertEqual(4, len(groups))
+        self.assertItemsEqual(events[0:3], groups[0])
+        self.assertItemsEqual(events[3:4], groups[1])
+        self.assertItemsEqual(events[4:7], groups[2])
+        self.assertItemsEqual(events[7:9], groups[3])
 
 
 class FormatTimeTestCase(unittest.TestCase):
