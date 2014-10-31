@@ -126,7 +126,7 @@ class SrtScript(ScriptBase):
             raise SushiError("Script {0} not found".format(path))
 
     def save_to_file(self, path):
-        text = '\n\n'.join(unicode(x) for x in self.events)
+        text = '\n\n'.join(map(unicode, self.events))
         with codecs.open(path, encoding='utf-8', mode= 'w') as file:
             file.write(text)
 
@@ -218,9 +218,7 @@ class AssScript(ScriptBase):
         if self.events:
             lines.append(u'[Events]')
             lines.append(u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
-            for line in self.events:
-                lines.append(unicode(line))
+            lines.extend(map(unicode, self.events))
 
         with codecs.open(path, encoding='utf-8', mode= 'w') as file:
             file.write(unicode(os.linesep).join(lines))
-            # print(u'\n'.join(lines))
