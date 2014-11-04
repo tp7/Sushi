@@ -199,6 +199,8 @@ class AssScript(ScriptBase):
                         parse_function(line)
         except IOError:
             raise SushiError("Script {0} not found".format(path))
+        for idx, event in enumerate(self.events):
+            event.source_index = idx
 
     def save_to_file(self, path):
         # if os.path.exists(path):
@@ -216,9 +218,10 @@ class AssScript(ScriptBase):
             lines.append('')
 
         if self.events:
+            events = sorted(self.events, key=lambda x: x.source_index)
             lines.append(u'[Events]')
             lines.append(u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
-            lines.extend(map(unicode, self.events))
+            lines.extend(map(unicode, events))
 
         with codecs.open(path, encoding='utf-8', mode= 'w') as file:
             file.write(unicode(os.linesep).join(lines))
