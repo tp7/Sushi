@@ -196,7 +196,10 @@ class AssScript(ScriptBase):
                     elif not parse_function:
                         raise SushiError("That's some invalid ASS script")
                     else:
-                        parse_function(line)
+                        try:
+                            parse_function(line)
+                        except Exception as e:
+                            raise SushiError("That's some invalid ASS script: {0}".format(e.message))
         except IOError:
             raise SushiError("Script {0} not found".format(path))
         for idx, event in enumerate(self.events):
