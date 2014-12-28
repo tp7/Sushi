@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import logging
 from common import SushiError, get_extension, format_time
 from demux import Timecodes, Demuxer
