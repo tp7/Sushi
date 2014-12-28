@@ -7,6 +7,7 @@ def _parse_ass_time(string):
     hours, minutes, seconds = map(float, string.split(':'))
     return hours*3600+minutes*60+seconds
 
+
 class ScriptEventBase(object):
     def __init__(self, start, end):
         super(ScriptEventBase, self).__init__()
@@ -120,15 +121,15 @@ class SrtScript(ScriptBase):
     def __init__(self, path):
         super(SrtScript, self).__init__()
         try:
-            with codecs.open(path, encoding='utf-8-sig') as file:
-                self.events = [SrtEvent(x) for x in file.read().replace(os.linesep, '\n').split('\n\n') if x]
+            with codecs.open(path, encoding='utf-8-sig') as script:
+                self.events = [SrtEvent(x) for x in script.read().replace(os.linesep, '\n').split('\n\n') if x]
         except IOError:
             raise SushiError("Script {0} not found".format(path))
 
     def save_to_file(self, path):
         text = '\n\n'.join(map(unicode, self.events))
-        with codecs.open(path, encoding='utf-8', mode= 'w') as file:
-            file.write(text)
+        with codecs.open(path, encoding='utf-8', mode='w') as script:
+            script.write(text)
 
 
 class AssEvent(ScriptEventBase):
@@ -179,8 +180,8 @@ class AssScript(ScriptBase):
         parse_function = None
 
         try:
-            with codecs.open(path, encoding='utf-8-sig') as file:
-                for line in file:
+            with codecs.open(path, encoding='utf-8-sig') as script:
+                for line in script:
                     line = line.strip()
                     if not line:
                         continue
@@ -192,7 +193,7 @@ class AssScript(ScriptBase):
                     elif low == u'[events]':
                         parse_function = parse_event_line
                     elif low.startswith(u'format:'):
-                        continue # ignore it
+                        continue  # ignore it
                     elif not parse_function:
                         raise SushiError("That's some invalid ASS script")
                     else:
@@ -226,5 +227,5 @@ class AssScript(ScriptBase):
             lines.append(u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
             lines.extend(map(unicode, events))
 
-        with codecs.open(path, encoding='utf-8', mode= 'w') as file:
-            file.write(unicode(os.linesep).join(lines))
+        with codecs.open(path, encoding='utf-8', mode='w') as script:
+            script.write(unicode(os.linesep).join(lines))
