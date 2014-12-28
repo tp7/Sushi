@@ -119,7 +119,7 @@ class SCXviD(object):
             raise
 
         try:
-            scxvid_process = Popen(['SCXvid.exe', log_path], stdin=ffmpeg_process.stdout)
+            scxvid_process = Popen(['SCXvid', log_path], stdin=ffmpeg_process.stdout)
         except OSError as e:
             ffmpeg_process.kill()
             if e.errno == 2:
