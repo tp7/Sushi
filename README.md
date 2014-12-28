@@ -24,15 +24,14 @@ Output file name is optional - `"{destination_path}.sushi.{subtitles_format}"` i
 Do note that WAV is not the only format Sushi can work with. It can process audio/video files directly and decode various audio formats, provided that ffmpeg is available. For additional info refer to the [Demuxing][4] part of the wiki.
 
 ### Requirements
-To run Sushi, you need to have the following installed:
+Sushi should work on Windows, Linux and OS X. Please open an issue if it doesn't. To run it, you have to have the following installed:
 
-1. Windows. It is expected to run on all other operation systems but Windows is the only platform it's actively tested on.
-2. [Python 2.7.x][5] (won't run on 3.x until OpenCV 3 is released)
-3. [NumPy 1.8.1][6]
-4. [OpenCV 2.4.9][7] (putting [this file][8] in the same folder as Sushi should be enough, assuming you use x86 Python)
-5. [FFmpeg][9] (only if demuxing is used)
-6. [MkvExtract][10] (optional for faster timecodes extraction when demuxing)
-7. [SCXvid-standalone][11] (only if keyframes are made by Sushi)
+1. [Python 2.7.x][5]
+2. [NumPy][6] (1.8 or newer)
+3. [OpenCV 2.4.9][7] (on Windows putting [this file][8] in the same folder as Sushi should be enough, assuming you use x86 Python)
+4. [FFmpeg][9] (only if demuxing is used)
+5. [MkvExtract][10] (optional for faster timecodes extraction when demuxing)
+6. [SCXvid-standalone][11] (only if keyframes are made by Sushi)
 
 The provided Windows binaries include Python, NumPy and OpenCV so you don't have to install them if you use the binary distribution. You still have to download other applications yourself if you want to use Sushi's demuxing capabilities.
 
