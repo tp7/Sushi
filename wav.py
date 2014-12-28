@@ -115,23 +115,25 @@ class WavStream(object):
 
         self.sample_count = int(total_seconds * sample_rate)
         self.sample_rate = sample_rate
+        self.data = np.empty((1, self.sample_count), np.float32)
 
         before_read = time()
         try:
             seconds_read = 0
-            arrays = []
+            samples_read = 0
             while seconds_read < total_seconds:
                 data = file.readframes(int(self.READ_CHUNK_SIZE * file.framerate))
                 new_length = int(round(len(data) * downsample_rate))
 
-                data = data.reshape((1, len(data)))
+                dst_view = self.data[0][samples_read:samples_read+new_length]
+
                 if downsample_rate != 1:
-                    data = cv2.resize(data, (new_length, 1), interpolation=cv2.INTER_NEAREST)
-                arrays.append(data)
+                    data = data.reshape((1, len(data)))
+                    data = cv2.resize(data, (new_length, 1), interpolation=cv2.INTER_NEAREST)[0]
 
+                np.copyto(dst_view, data, casting='no')
+                samples_read += new_length
                 seconds_read += self.READ_CHUNK_SIZE
-
-            self.data = np.concatenate(arrays, axis=1)
 
             # normalizing
             # also clipping the stream by 3*median value from both sides of zero
