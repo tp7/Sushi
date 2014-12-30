@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import logging
-from common import SushiError, get_extension, format_time
+from common import SushiError, get_extension, format_time, ensure_static_collection
 from demux import Timecodes, Demuxer
 from keyframes import parse_keyframes
 from subs import AssScript, SrtScript
@@ -60,7 +60,7 @@ def write_shift_avs(output_path, groups, src_audio, dst_audio):
 
 
 def interpolate_nones(data, points):
-    data = list(data)
+    data = ensure_static_collection(data)
     data_idx = [point for point, value in izip(points, data) if value is not None]
     if not data_idx:
         return []
@@ -321,7 +321,7 @@ def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts
     search_groups = []
     chapter_times = iter(chapter_times[1:] + [100000000])
     next_chapter = next(chapter_times)
-    events = list(events)
+    events = ensure_static_collection(events)
 
     processed = set()
     for idx, event in enumerate(events):
