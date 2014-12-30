@@ -285,16 +285,16 @@ def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_dist
             shifts = zip(*(iter(shifts), ) * 2)
 
             logging.debug('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), mean_shift))
-            for group, shift in izip(groups, shifts):
-                if abs(shift[0]-shift[1]) > 0.001 and len(group) > 1:
-                    actual_shift = min(shift[0], shift[1], key=lambda x: abs(x - mean_shift))
+            for group, (start_shift, end_shift) in izip(groups, shifts):
+                if abs(start_shift-end_shift) > 0.001 and len(group) > 1:
+                    actual_shift = min(start_shift, end_shift, key=lambda x: abs(x - mean_shift))
                     logging.warning("Typesetting group at {0} had different shift at start/end points ({1} and {2}). Shifting by {3}."
-                                    .format(format_time(group[0].start), shift[0], shift[1], actual_shift))
+                                    .format(format_time(group[0].start), start_shift, end_shift, actual_shift))
                     for e in group:
                         e.adjust_shift(actual_shift)
                 else:
                     for e in group:
-                        e.adjust_additional_shifts(shift[0], shift[1])
+                        e.adjust_additional_shifts(start_shift, end_shift)
 
     if kf_mode == 'all' or kf_mode == 'snap':
         # step 2: snap start/end times separately
@@ -630,7 +630,6 @@ def run(args):
                 e.resolve_link()
             snap_groups_to_keyframes(events, chapter_times, args.max_ts_duration, args.max_ts_distance, src_keytimes,
                                      dst_keytimes, src_timecodes, dst_timecodes, args.max_kf_distance, args.kf_mode)
-
 
         apply_shifts(events)
 
