@@ -6,7 +6,7 @@ from keyframes import parse_keyframes
 from subs import AssScript, SrtScript
 from wav import WavStream
 import sys
-from itertools import takewhile
+from itertools import takewhile, izip
 import numpy as np
 import argparse
 import chapters
@@ -61,10 +61,10 @@ def write_shift_avs(output_path, groups, src_audio, dst_audio):
 
 def interpolate_nones(data, points):
     data = list(data)
-    data_idx = [point for point, value in zip(points, data) if value is not None]
+    data_idx = [point for point, value in izip(points, data) if value is not None]
     if not data_idx:
         return []
-    zero_idx = [point for point, value in zip(points, data) if value is None]
+    zero_idx = [point for point, value in izip(points, data) if value is None]
     if not zero_idx:
         return data
     data_values = [value for value in data if value is not None]
@@ -75,6 +75,7 @@ def interpolate_nones(data, points):
             data[point] = next(out, None)
 
     return data
+
 
 # todo: implement this as a running median
 def running_median(values, window_size):
@@ -96,7 +97,7 @@ def smooth_events(events, radius):
     window_size = radius*2+1
     shifts = [e.shift for e in events]
     smoothed = running_median(shifts, window_size)
-    for event, new_shift in zip(events, smoothed):
+    for event, new_shift in izip(events, smoothed):
         event.set_shift(new_shift, event.diff)
 
 
@@ -284,7 +285,7 @@ def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_dist
             shifts = zip(*(iter(shifts), ) * 2)
 
             logging.debug('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), mean_shift))
-            for group, shift in zip(groups, shifts):
+            for group, shift in izip(groups, shifts):
                 if abs(shift[0]-shift[1]) > 0.001 and len(group) > 1:
                     actual_shift = min(shift[0], shift[1], key=lambda x: abs(x - mean_shift))
                     logging.warning("Typesetting group at {0} had different shift at start/end points ({1} and {2}). Shifting by {3}."
