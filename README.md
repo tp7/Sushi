@@ -28,7 +28,7 @@ Sushi should work on Windows, Linux and OS X. Please open an issue if it doesn't
 
 1. [Python 2.7.x][5]
 2. [NumPy][6] (1.8 or newer)
-3. [OpenCV 2.4.9][7] (on Windows putting [this file][8] in the same folder as Sushi should be enough, assuming you use x86 Python)
+3. [OpenCV 2.4.x][7] (on Windows putting [this file][8] in the same folder as Sushi should be enough, assuming you use x86 Python)
 4. [FFmpeg][9] (only if demuxing is used)
 5. [MkvExtract][10] (optional for faster timecodes extraction when demuxing)
 6. [SCXvid-standalone][11] (only if keyframes are made by Sushi)

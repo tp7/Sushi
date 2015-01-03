@@ -6,7 +6,7 @@ import sys
 setup(
     name='Sushi',
     description='Automatic subtitle shifter based on audio',
-    version='0.4.1',
+    version='0.4.2',
     url='https://github.com/tp7/Sushi',
     console=['sushi.py'],
     license='MIT',
