@@ -358,7 +358,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
             try:
                 event.link_event(events[idx+1])
             except IndexError:
-                event.link_event(events[idx-1])
+                event.link_event(next(x for x in reversed(events[:idx]) if not x.linked))
             continue
         if (event.start + event.duration / 2.0) > src_stream.duration_seconds:
             logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
