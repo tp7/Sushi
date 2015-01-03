@@ -125,7 +125,6 @@ def run_test(base_path, plots_path, test_name, params):
         cmd.extend(('--test-shift-plot', os.path.join(plots_path, '{0}.png'.format(test_name))))
 
     with set_file_logger(os.path.join(folder, 'sushi_test.log')):
-        logging.debug(' '.join(cmd))
         try:
             with remove_console_logger():
                 parse_args_and_run(cmd)

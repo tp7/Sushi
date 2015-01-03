@@ -718,6 +718,10 @@ def create_arg_parser():
 
 
 def parse_args_and_run(cmd_keys):
+    def format_arg(arg):
+        return arg if ' ' not in arg else '"{0}"'.format(arg)
+
+    logging.debug("Sushi's running with arguments: {0}".format(' '.join(map(format_arg, cmd_keys))))
     args = create_arg_parser().parse_args(cmd_keys)
     start_time = time()
     run(args)
