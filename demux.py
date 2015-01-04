@@ -40,8 +40,7 @@ class FFmpeg(object):
         script_stream = kwargs.get('script_stream', None)
         script_path = kwargs.get('script_path', None)
         if script_stream is not None:
-            args.extend(('-map', '0:{0}'.format(script_stream)))
-            args.extend(('-scodec', 'copy', script_path))
+            args.extend(('-map', '0:{0}'.format(script_stream), script_path))
 
         video_stream = kwargs.get('video_stream', None)
         timecodes_path = kwargs.get('timecodes_path', None)
