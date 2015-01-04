@@ -43,8 +43,8 @@ def remove_console_logger():
         root_logger.addHandler(console_handler)
 
 def compare_scripts(ideal_path, test_path, timecodes, test_name, expected_errors):
-    ideal = AssScript(ideal_path)
-    test = AssScript(test_path)
+    ideal = AssScript.from_file(ideal_path)
+    test = AssScript.from_file(test_path)
     if len(test.events) != len(ideal.events):
         logging.critical("Script length didn't match: {0} in ideal vs {1} in test. Test {2}".format(len(ideal.events), len(test.events), test_name))
         return False

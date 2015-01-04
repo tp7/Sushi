@@ -118,11 +118,15 @@ class SrtEvent(ScriptEventBase):
 
 
 class SrtScript(ScriptBase):
-    def __init__(self, path):
+    def __init__(self, events):
         super(SrtScript, self).__init__()
+        self.events = events
+
+    @classmethod
+    def from_file(cls, path):
         try:
             with codecs.open(path, encoding='utf-8-sig') as script:
-                self.events = [SrtEvent(x) for x in script.read().replace(os.linesep, '\n').split('\n\n') if x]
+                return cls([SrtEvent(x) for x in script.read().replace(os.linesep, '\n').split('\n\n') if x])
         except IOError:
             raise SushiError("Script {0} not found".format(path))
 
@@ -168,15 +172,20 @@ class AssEvent(ScriptEventBase):
 
 
 class AssScript(ScriptBase):
-    def __init__(self, path):
-        parse_script_info_line = lambda x: self.script_info.append(x)
-        parse_styles_line = lambda x: self.styles.append(x)
-        parse_event_line = lambda x: self.events.append(AssEvent(x))
-
+    def __init__(self, script_info, styles, events):
         super(AssScript, self).__init__()
-        self.script_info = []
-        self.styles = []
-        self.events = []
+        self.script_info = script_info
+        self.styles = styles
+        self.events = events
+
+    @classmethod
+    def from_file(cls, path):
+        script_info, styles, events = [], [], []
+
+        parse_script_info_line = lambda x: script_info.append(x)
+        parse_styles_line = lambda x: styles.append(x)
+        parse_event_line = lambda x: events.append(AssEvent(x))
+
         parse_function = None
 
         try:
@@ -203,8 +212,9 @@ class AssScript(ScriptBase):
                             raise SushiError("That's some invalid ASS script: {0}".format(e.message))
         except IOError:
             raise SushiError("Script {0} not found".format(path))
-        for idx, event in enumerate(self.events):
+        for idx, event in enumerate(events):
             event.source_index = idx
+        return cls(script_info, styles, events)
 
     def save_to_file(self, path):
         # if os.path.exists(path):

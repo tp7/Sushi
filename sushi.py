@@ -565,7 +565,7 @@ def run(args):
             dst_timecodes = Timecodes.cfr(args.dst_fps) if args.dst_fps else Timecodes.from_file(dst_timecodes_file)
             dst_keytimes = [dst_timecodes.get_frame_time(f) for f in parse_keyframes(dst_keyframes_file)]
 
-        script = AssScript(src_script_path) if script_extension == '.ass' else SrtScript(src_script_path)
+        script = AssScript.from_file(src_script_path) if script_extension == '.ass' else SrtScript.from_file(src_script_path)
         script.sort_by_time()
 
         src_stream = WavStream(src_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
