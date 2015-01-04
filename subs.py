@@ -138,6 +138,7 @@ class SrtScript(ScriptBase):
 
 class AssEvent(ScriptEventBase):
     def __init__(self, text):
+        self.source_index = 0
         split = text.split(':', 1)
         self.kind = split[0]
         self.is_comment = self.kind.lower() == 'comment'
