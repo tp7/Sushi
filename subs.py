@@ -227,5 +227,5 @@ class AssScript(ScriptBase):
             lines.append(u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
             lines.extend(map(unicode, events))
 
-        with codecs.open(path, encoding='utf-8', mode='w') as script:
+        with codecs.open(path, encoding='utf-8-sig', mode='w') as script:
             script.write(unicode(os.linesep).join(lines))
