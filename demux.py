@@ -1,6 +1,6 @@
 import os
-from subprocess import Popen, PIPE
 import re
+import subprocess
 from collections import namedtuple
 import logging
 import bisect
@@ -15,7 +15,7 @@ class FFmpeg(object):
     @staticmethod
     def get_info(path):
         try:
-            process = Popen(['ffmpeg', '-hide_banner', '-i', path], stderr=PIPE)
+            process = subprocess.Popen(['ffmpeg', '-hide_banner', '-i', path], stderr=subprocess.PIPE)
             out, err = process.communicate()
             process.wait()
             return err
@@ -49,8 +49,7 @@ class FFmpeg(object):
 
         logging.debug('ffmpeg args: {0}'.format(' '.join(('"{0}"' if ' ' in a else '{0}').format(a) for a in args)))
         try:
-            process = Popen(args)
-            process.wait()
+            subprocess.call(args)
         except OSError as e:
             if e.errno == 2:
                 raise SushiError("Couldn't invoke ffmpeg, check that it's installed")
@@ -100,25 +99,24 @@ class MkvToolnix(object):
     @classmethod
     def extract_timecodes(cls, mkv_path, stream_idx, output_path):
         args = ['mkvextract', 'timecodes_v2', mkv_path, '{0}:{1}'.format(stream_idx, output_path)]
-        process = Popen(args)
-        process.wait()
+        subprocess.call(args)
 
 class SCXviD(object):
     @classmethod
     def make_keyframes(cls, video_path, log_path):
         try:
-            ffmpeg_process = Popen(['ffmpeg', '-i', video_path,
+            ffmpeg_process = subprocess.Popen(['ffmpeg', '-i', video_path,
                             '-f', 'yuv4mpegpipe',
                             '-vf', 'scale=640:360',
                             '-pix_fmt', 'yuv420p',
-                            '-vsync', 'drop', '-'], stdout=PIPE)
+                            '-vsync', 'drop', '-'], stdout=subprocess.PIPE)
         except OSError as e:
             if e.errno == 2:
                 raise SushiError("Couldn't invoke ffmpeg, check that it's installed")
             raise
 
         try:
-            scxvid_process = Popen(['SCXvid', log_path], stdin=ffmpeg_process.stdout)
+            scxvid_process = subprocess.Popen(['SCXvid', log_path], stdin=ffmpeg_process.stdout)
         except OSError as e:
             ffmpeg_process.kill()
             if e.errno == 2:
