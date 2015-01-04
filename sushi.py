@@ -432,11 +432,6 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
                       .format(format_time(search_group[0].start), format_time(search_group[-1].end), time_offset, diff))
 
 
-def apply_shifts(events):
-    for e in events:
-        e.apply_shift()
-
-
 def check_file_exists(path, file_title):
     if path and not os.path.exists(path):
         raise SushiError("{0} file doesn't exist".format(file_title))
@@ -625,13 +620,14 @@ def run(args):
             if write_plot:
                 plt.plot([x.shift for x in events], label='Borders fixed')
 
-        if not args.grouping and args.src_keyframes:
-            for e in (x for x in events if x.linked):
-                e.resolve_link()
-            snap_groups_to_keyframes(events, chapter_times, args.max_ts_duration, args.max_ts_distance, src_keytimes,
-                                     dst_keytimes, src_timecodes, dst_timecodes, args.max_kf_distance, args.kf_mode)
+            if args.src_keyframes:
+                for e in (x for x in events if x.linked):
+                    e.resolve_link()
+                snap_groups_to_keyframes(events, chapter_times, args.max_ts_duration, args.max_ts_distance, src_keytimes,
+                                         dst_keytimes, src_timecodes, dst_timecodes, args.max_kf_distance, args.kf_mode)
 
-        apply_shifts(events)
+        for event in events:
+            event.apply_shift()
 
         script.save_to_file(dst_script_path)
 
