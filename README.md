@@ -1,4 +1,4 @@
-## Sushi ##
+## Sushi [![Build Status](https://travis-ci.org/tp7/Sushi.svg?branch=master)](https://travis-ci.org/tp7/Sushi)
 Automatic shifter for SRT and ASS subtitle based on audio streams.
 
 ### Purpose
