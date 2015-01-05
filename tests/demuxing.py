@@ -1,7 +1,7 @@
 import unittest
 import mock
 
-from demux import FFmpeg
+from demux import FFmpeg, MkvToolnix, SCXviD
 from common import SushiError
 
 
@@ -76,3 +76,39 @@ class FFmpegTestCase(unittest.TestCase):
                                    '-map', '0:1', '-ar', '12000', '-ac', '1', '-acodec', 'pcm_s16le', 'audio0.wav',
                                    '-map', '0:2', 'out0.ass',
                                    '-map', '0:0', '-f', 'mkvtimestamp_v2', 'tcs0.txt'])
+
+
+class MkvExtractTestCase(unittest.TestCase):
+    @mock.patch('subprocess.call')
+    def test_extract_timecodes(self, call_mock):
+        MkvToolnix.extract_timecodes('video.mkv', 1, 'timecodes.tsc')
+        call_mock.assert_called_once_with(['mkvextract', 'timecodes_v2', 'video.mkv', '1:timecodes.tsc'])
+
+
+class SCXviDTestCase(unittest.TestCase):
+    @mock.patch('subprocess.Popen')
+    def test_make_keyframes(self, popen_mock):
+        SCXviD.make_keyframes('video.mkv', 'keyframes.txt')
+        self.assertTrue('ffmpeg' in (x.lower() for x in popen_mock.call_args_list[0][0][0]))
+        self.assertTrue('scxvid' in (x.lower() for x in popen_mock.call_args_list[1][0][0]))
+
+    @mock.patch('subprocess.Popen')
+    def test_no_ffmpeg(self, popen_mock):
+        def raise_no_app(cmd_args, **kwargs):
+            if 'ffmpeg' in (x.lower() for x in cmd_args):
+                raise OSError(2, 'ignored')
+
+        popen_mock.side_effect = raise_no_app
+        self.assertRaisesRegexp(SushiError, '[fF][fF][mM][pP][eE][gG]',
+                                lambda: SCXviD.make_keyframes('video.mkv', 'keyframes.txt'))
+
+    @mock.patch('subprocess.Popen')
+    def test_no_scxvid(self, popen_mock):
+        def raise_no_app(cmd_args, **kwargs):
+            if 'scxvid' in (x.lower() for x in cmd_args):
+                raise OSError(2, 'ignored')
+            return mock.Mock()
+
+        popen_mock.side_effect = raise_no_app
+        self.assertRaisesRegexp(SushiError, '[sS][cC][xX][vV][iI][dD]',
+                                lambda: SCXviD.make_keyframes('video.mkv', 'keyframes.txt'))
