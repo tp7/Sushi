@@ -35,6 +35,31 @@ Sushi should work on Windows, Linux and OS X. Please open an issue if it doesn't
 
 The provided Windows binaries include Python, NumPy and OpenCV so you don't have to install them if you use the binary distribution. You still have to download other applications yourself if you want to use Sushi's demuxing capabilities.
 
+#### Installation on Mac OS X
+
+No binary packages are provided for OS X right now so you'll have to use the script form. Assuming you have python 2, pip and [homebrew](http://brew.sh/) installed, run the following:
+```bash
+brew tap homebrew/science
+brew install git opencv
+pip install numpy
+git clone https://github.com/tp7/sushi
+# create a symlink if you want to run sushi globally
+ln -s `pwd`/sushi/sushi.py /usr/local/bin/sushi
+```
+If you don't have pip, you can install numpy with homebrew, but that will probably install a few more dependencies.
+```bash
+brew tap homebrew/python
+brew install numpy
+```
+#### Installation on Linux
+If you have apt-get available, the installation process is trivial.
+```bash
+sudo apt-get update
+sudo apt-get install git python python-numpy python-opencv
+git clone https://github.com/tp7/sushi
+ln -s `pwd`/sushi/sushi.py /usr/local/bin/sushi
+```
+
 ### Limitations
 This script will never be able to property handle frame-by-frame typesetting. If underlying video stream changes (e.g. has different telecine pattern), you might get incorrect output.
 
