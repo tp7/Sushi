@@ -1,6 +1,9 @@
 from distutils.core import setup
 import os
-import py2exe
+try:
+    import py2exe
+except ImportError:
+    pass
 import sys
 
 setup(
