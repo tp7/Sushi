@@ -45,12 +45,15 @@ pip install numpy
 git clone https://github.com/tp7/sushi
 # create a symlink if you want to run sushi globally
 ln -s `pwd`/sushi/sushi.py /usr/local/bin/sushi
+# install some optional dependencies
+brew install ffmpeg mkvtoolnix
 ```
-If you don't have pip, you can install numpy with homebrew, but that will probably install a few more dependencies.
+If you don't have pip, you can install numpy with homebrew, but that will probably add a few more dependencies.
 ```bash
 brew tap homebrew/python
 brew install numpy
 ```
+
 #### Installation on Linux
 If you have apt-get available, the installation process is trivial.
 ```bash
