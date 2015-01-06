@@ -649,13 +649,13 @@ def create_arg_parser():
                         help='Search window size')
     parser.add_argument('--no-grouping', action='store_false', dest='grouping',
                         help='Split events into groups before shifting')
-    parser.add_argument('--min-group-size', default=1, type=int, dest='min_group_size',
+    parser.add_argument('--min-group-size', default=1, type=int, metavar='<events>', dest='min_group_size',
                         help='Minimum size of automatic group')
     parser.add_argument('--max-kf-distance', default=2, type=float, metavar='<frames>', dest='max_kf_distance',
                         help='Maximum keyframe snapping distance [0.75]')
     parser.add_argument('--kf-mode', default='all', choices=['shift', 'snap', 'all'], dest='kf_mode',
                         help='Keyframes-based shift correction/snapping mode')
-    parser.add_argument('--smooth-radius', default=3, type=int, dest='smooth_radius',
+    parser.add_argument('--smooth-radius', default=3, type=int, metavar='<events>', dest='smooth_radius',
                         help='Radius of smoothing median filter')
 
     # 10 frames at 23.976
