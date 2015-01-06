@@ -667,8 +667,8 @@ def create_arg_parser():
                         dest='max_ts_distance',
                         help='Maximum distance between two adjacent typesetting lines to be merged')
 
-    parser.add_argument('--test-write-avs', action='store_true', dest='write_avs',help=argparse.SUPPRESS)
-    parser.add_argument('--test-shift-plot', default=None, dest='plot_path',help=argparse.SUPPRESS)
+    parser.add_argument('--test-write-avs', action='store_true', dest='write_avs', help=argparse.SUPPRESS)
+    parser.add_argument('--test-shift-plot', default=None, dest='plot_path', help=argparse.SUPPRESS)
 
     # optimizations
     parser.add_argument('--sample-rate', default=12000, type=int, metavar='<rate>', dest='sample_rate',
@@ -717,8 +717,8 @@ def parse_args_and_run(cmd_keys):
     def format_arg(arg):
         return arg if ' ' not in arg else '"{0}"'.format(arg)
 
-    logging.debug("Sushi's running with arguments: {0}".format(' '.join(map(format_arg, cmd_keys))))
     args = create_arg_parser().parse_args(cmd_keys)
+    logging.debug("Sushi's running with arguments: {0}".format(' '.join(map(format_arg, cmd_keys))))
     start_time = time()
     run(args)
     logging.info('Done in {0}s'.format(time() - start_time))
