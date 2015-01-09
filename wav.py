@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from chunk import Chunk
 import struct
+import math
 from time import time
 import os.path
 from common import SushiError
@@ -111,7 +112,7 @@ class WavStream(object):
         total_seconds = file.frames_count / float(file.framerate)
         downsample_rate = sample_rate / float(file.framerate)
 
-        self.sample_count = int(total_seconds * sample_rate)
+        self.sample_count = math.ceil(total_seconds * sample_rate)
         self.sample_rate = sample_rate
         self.data = np.empty((1, self.sample_count), np.float32)
 
