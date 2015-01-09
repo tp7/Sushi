@@ -155,12 +155,16 @@ def run_wav_test(test_name, file_path, params):
     after = resource.getrusage(resource.RUSAGE_SELF)
     total_time = (after.ru_stime - before.ru_stime) + (after.ru_utime - before.ru_utime)
     ram_difference = (after.ru_maxrss - before.ru_maxrss) / 1024.0 / 1024.0
+    success = True
     if 'max_time' in params and total_time > params['max_time']:
         logging.critical('Loading "{0}" took too much time: {1} vs {2} seconds'
                          .format(test_name, total_time, params['max_time']))
+        success = False
     if 'max_memory' in params and ram_difference > params['max_memory']:
         logging.critical('Loading "{0}" consumed too much RAM: {1} vs {2}'
                          .format(test_name, ram_difference, params['max_memory']))
+        success = False
+    return success
 
 def run():
     root_logger.setLevel(logging.DEBUG)
