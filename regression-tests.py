@@ -15,6 +15,7 @@ root_logger = logging.getLogger('')
 
 tags_stripper = re.compile(r'{.*?}')
 
+
 def strip_tags(text):
     return tags_stripper.sub(" ", text)
 
@@ -34,6 +35,7 @@ def set_file_logger(path):
     finally:
         root_logger.removeHandler(handler)
 
+
 @contextmanager
 def remove_console_logger():
     root_logger.removeHandler(console_handler)
@@ -41,6 +43,7 @@ def remove_console_logger():
         yield
     finally:
         root_logger.addHandler(console_handler)
+
 
 def compare_scripts(ideal_path, test_path, timecodes, test_name, expected_errors):
     ideal = AssScript.from_file(ideal_path)
@@ -148,7 +151,6 @@ def run():
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(logging.Formatter('%(message)s'))
     root_logger.addHandler(console_handler)
-    failed = ran = 0
     try:
         with open('tests.json') as file:
             json = load(file)
@@ -156,26 +158,21 @@ def run():
         logging.critical(e)
         sys.exit(2)
 
-    try:
-        run_only = json['run-only']
-    except KeyError:
-        run_only = None
+    run_only = json.get('run-only')
 
-    for test_name in json['tests']:
+    failed = ran = 0
+    for test_name, params in json['tests'].iteritems():
         if run_only and test_name not in run_only:
             continue
-        params = json['tests'][test_name]
-        try:
-            enabled = not params['disabled']
-        except KeyError:
-            enabled = True
-        if enabled:
+        if not params.get('disabled', False):
             ran += 1
             if not run_test(json['basepath'], json['plots'], test_name, params):
                 failed += 1
             logging.info('')
         else:
             logging.warn('Test "{0}" disabled'.format(test_name))
+
+
     logging.info('Ran {0} tests, {1} failed'.format(ran, failed))
 
 
