@@ -18,5 +18,14 @@
             "max-kf-distance": 3,
             "expected_errors": 84
         }
+    },
+    "wavs": {
+        "first wav": {
+            "max_time": 0.7,
+            "max_memory": 120,
+            "sample_type": "uint8",
+            "sample_rate": 12000,
+            "file": "wavs/file.wav"
+        }
     }
 }

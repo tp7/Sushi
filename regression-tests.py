@@ -2,10 +2,13 @@ from contextlib import contextmanager
 from json import load
 import logging
 import os
+import gc
 import sys
+import resource
 from common import format_time, SushiError
 from demux import Timecodes
 from subs import AssScript
+from wav import WavStream
 import re
 from sushi import parse_args_and_run
 
@@ -144,6 +147,21 @@ def run_test(base_path, plots_path, test_name, params):
         return compare_scripts(ideal_path, output_path, timecodes, test_name, params['expected_errors'])
 
 
+def run_wav_test(test_name, file_path, params):
+    gc.collect(2)
+    before = resource.getrusage(resource.RUSAGE_SELF)
+    loaded = WavStream(file_path, params.get('sample_rate', 12000), params.get('sample_type', 'uint8'))
+
+    after = resource.getrusage(resource.RUSAGE_SELF)
+    total_time = (after.ru_stime - before.ru_stime) + (after.ru_utime - before.ru_utime)
+    ram_difference = (after.ru_maxrss - before.ru_maxrss) / 1024.0 / 1024.0
+    if 'max_time' in params and total_time > params['max_time']:
+        logging.critical('Loading "{0}" took too much time: {1} vs {2} seconds'
+                         .format(test_name, total_time, params['max_time']))
+    if 'max_memory' in params and ram_difference > params['max_memory']:
+        logging.critical('Loading "{0}" consumed too much RAM: {1} vs {2}'
+                         .format(test_name, ram_difference, params['max_memory']))
+
 def run():
     root_logger.setLevel(logging.DEBUG)
     global console_handler
@@ -161,7 +179,7 @@ def run():
     run_only = json.get('run-only')
 
     failed = ran = 0
-    for test_name, params in json['tests'].iteritems():
+    for test_name, params in json.get('tests', {}).iteritems():
         if run_only and test_name not in run_only:
             continue
         if not params.get('disabled', False):
@@ -172,7 +190,11 @@ def run():
         else:
             logging.warn('Test "{0}" disabled'.format(test_name))
 
-
+    for test_name, params in json.get('wavs', {}).iteritems():
+        ran += 1
+        if not run_wav_test(test_name, os.path.join(json['basepath'], params['file']), params):
+            failed += 1
+        logging.info('')
     logging.info('Ran {0} tests, {1} failed'.format(ran, failed))
 
 
