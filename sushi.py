@@ -209,11 +209,11 @@ def fix_near_borders(events):
 
     fixed_count = fix_border(events, median_diff)
     if fixed_count:
-        logging.debug('Fixing {0} events near start'.format(fixed_count))
+        logging.debug('Fixing {0} border events right after {1}'.format(fixed_count, format_time(events[0].start)))
 
     fixed_count = fix_border(list(reversed(events)), median_diff)
     if fixed_count:
-        logging.debug('Fixing {0} events near end'.format(fixed_count))
+        logging.debug('Fixing {0} border events right before {1}'.format(fixed_count, format_time(events[-1].end)))
 
 
 def get_distance_to_closest_kf(timestamp, keyframes):
