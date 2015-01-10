@@ -21,16 +21,24 @@ class FFmpegTestCase(unittest.TestCase):
         Stream #0:1(jpn): Audio: aac, 48000 Hz, stereo, fltp (default)
         Metadata:
           title           : Audio AAC 2.0
-        Stream #0:2(eng): Subtitle: ssa (default)
+        Stream #0:2(eng): Audio: aac, 48000 Hz, stereo, fltp
+        Metadata:
+          title           : English Audio AAC 2.0
+        Stream #0:3(eng): Subtitle: ssa (default)
         Metadata:
           title           : English Subtitles
+        Stream #0:4(enm): Subtitle: ass
+        Metadata:
+          title           : English (JP honorifics)
         .................................'''
 
     def test_parses_audio_stream(self):
         audio = FFmpeg._get_audio_streams(self.ffmpeg_output)
-        self.assertEqual(len(audio), 1)
+        self.assertEqual(len(audio), 2)
         self.assertEqual(audio[0].id, 1)
         self.assertEqual(audio[0].title, 'Audio AAC 2.0')
+        self.assertEqual(audio[1].id, 2)
+        self.assertEqual(audio[1].title, 'English Audio AAC 2.0')
 
     def test_parses_video_stream(self):
         video = FFmpeg._get_video_streams(self.ffmpeg_output)
@@ -40,9 +48,13 @@ class FFmpegTestCase(unittest.TestCase):
 
     def test_parses_subtitles_stream(self):
         subs = FFmpeg._get_subtitles_streams(self.ffmpeg_output)
-        self.assertEqual(len(subs), 1)
-        self.assertEqual(subs[0].id, 2)
+        self.assertEqual(len(subs), 2)
+        self.assertEqual(subs[0].id, 3)
+        self.assertTrue(subs[0].default)
         self.assertEqual(subs[0].title, 'English Subtitles')
+        self.assertEqual(subs[1].id, 4)
+        self.assertFalse(subs[1].default)
+        self.assertEqual(subs[1].title, 'English (JP honorifics)')
 
     @mock.patch('subprocess.Popen', new_callable=create_popen_mock)
     def test_get_info_call_args(self, popen_mock):

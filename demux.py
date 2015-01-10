@@ -6,8 +6,8 @@ import logging
 import bisect
 from common import SushiError, get_extension
 
-MediaStreamInfo = namedtuple('MediaStreamInfo', ['id', 'info', 'title'])
-SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', 'title'])
+MediaStreamInfo = namedtuple('MediaStreamInfo', ['id', 'info', 'default', 'title'])
+SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', 'default', 'title'])
 MediaInfo = namedtuple('MediaInfo', ['video', 'audio', 'subtitles', 'chapters'])
 
 
@@ -57,15 +57,15 @@ class FFmpeg(object):
 
     @staticmethod
     def _get_audio_streams(info):
-        streams = re.findall(r'Stream #0:(\d+).*?Audio:(.*?)\r?\n(?:\s*Metadata:\s*\r?\n\s*title\s*:\s*(.*?)\r?\n)?',
+        streams = re.findall(r'Stream #0:(\d+).*?Audio:\s*(.*?(?:\((default)\))?)\r?\n(?:\s*Metadata:\s*\r?\n\s*title\s*:\s*(.*?)\r?\n)?',
                              info)
-        return [MediaStreamInfo(int(x[0]), x[1].strip(), x[2]) for x in streams]
+        return [MediaStreamInfo(int(x[0]), x[1], x[2] != '', x[3]) for x in streams]
 
     @staticmethod
     def _get_video_streams(info):
-        streams = re.findall(r'Stream #0:(\d+).*?Video:(.*?)\r?\n(?:\s*Metadata:\s*\r?\n\s*title\s*:\s*(.*?)\r?\n)?',
+        streams = re.findall(r'Stream #0:(\d+).*?Video:\s*(.*?(?:\((default)\))?)\r?\n(?:\s*Metadata:\s*\r?\n\s*title\s*:\s*(.*?)\r?\n)?',
                              info)
-        return [MediaStreamInfo(int(x[0]), x[1].strip(), x[2]) for x in streams]
+        return [MediaStreamInfo(int(x[0]), x[1], x[2] != '', x[3]) for x in streams]
 
     @staticmethod
     def _get_chapters_times(info):
@@ -78,12 +78,11 @@ class FFmpeg(object):
             'ass': '.ass',
             'subrip': '.srt'
         }
-        sanitize_type = lambda x: maps[x] if x in maps else x
 
         streams = re.findall(
-            r'Stream #0:(\d+).*?Subtitle:\s*((\w*)\s*?.*?)\r?\n(?:\s*Metadata:\s*\r?\n\s*title\s*:\s*(.*?)\r?\n)?',
+            r'Stream\s#0:(\d+).*?Subtitle:\s*((\w*)\s*?(?:\((default)\))?)\r?\n(?:\s*Metadata:\s*\r?\n\s*title\s*:\s*(.*?)\r?\n)?',
             info)
-        return [SubtitlesStreamInfo(int(x[0]), x[1].strip(), sanitize_type(x[2]), x[3].strip()) for x in streams]
+        return [SubtitlesStreamInfo(int(x[0]), x[1], maps.get(x[2], x[2]), x[3] != '', x[4].strip()) for x in streams]
 
     @classmethod
     def get_media_info(cls, path):
@@ -309,17 +308,26 @@ class Demuxer(object):
             os.remove(self._timecodes_output_path)
 
     @classmethod
-    def _format_streams(cls, streams):
-        return '\n'.join('{0}{1}: {2}'.format(s.id, ' (%s)' % s.title if s.title else '', s.info) for s in streams)
+    def _format_stream(cls, stream):
+        return '{0}{1}: {2}'.format(stream.id, ' (%s)' % stream.title if stream.title else '', stream.info)
+
+    @classmethod
+    def _format_streams_list(cls, streams):
+        return '\n'.join(map(cls._format_streams_list, streams))
 
     def _select_stream(self, streams, chosen_idx, name):
         if not streams:
             raise SushiError('No {0} streams found in {1}'.format(name, self._path))
         if chosen_idx is None:
             if len(streams) > 1:
+                default_track = next((s for s in streams if s.default), None)
+                if default_track:
+                    logging.warning('Using default track {0} in {1} because there are multiple candidates'
+                                    .format(self._format_stream(default_track), self._path))
+                    return default_track
                 raise SushiError('More than one {0} stream found in {1}.'
                                  'You need to specify the exact one to demux. Here are all candidates:\n'
-                                 '{2}'.format(name, self._path, self._format_streams(streams)))
+                                 '{2}'.format(name, self._path, self._format_streams_list(streams)))
             return streams[0]
 
         try:
@@ -327,5 +335,5 @@ class Demuxer(object):
         except StopIteration:
             raise SushiError("Stream with index {0} doesn't exist in {1}.\n"
                              "Here are all that do:\n"
-                             "{2}".format(chosen_idx, self._path, self._format_streams(streams)))
+                             "{2}".format(chosen_idx, self._path, self._format_streams_list(streams)))
 
