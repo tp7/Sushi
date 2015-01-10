@@ -194,10 +194,10 @@ def fix_near_borders(events):
     """
     def fix_border(event_list, median_diff):
         last_ten_diff = np.median([x.diff for x in event_list[:10]], overwrite_input=True)
-        diff_limit = min(last_ten_diff, median_diff)*5
+        diff_limit = min(last_ten_diff, median_diff)
         broken = []
         for event in event_list:
-            if event.diff > diff_limit:
+            if not 0.2 < (event.diff / diff_limit) < 5:
                 broken.append(event)
             else:
                 for x in broken:
