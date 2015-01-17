@@ -156,7 +156,24 @@ def groups_from_chapters(events, times):
 
         groups[-1].append(event)
 
-    return [g for g in groups if g]
+    groups = filter(None, groups)  # non-empty groups
+    # check if we have any groups where every event is linked
+    # for example a chapter with only comments inside
+    broken_groups = [group for group in groups if not any(e for e in group if not e.linked)]
+    if broken_groups:
+        for group in broken_groups:
+            for event in group:
+                parent = event.get_link_chain_end()
+                parent_group = next(group for group in groups if parent in group)
+                parent_group.append(event)
+            del group[:]
+        groups = filter(None, groups)
+        # re-sort the groups again since we might break the order when inserting linked events
+        # sorting everything again is far from optimal but python sorting is very fast for sorted arrays anyway
+        for group in groups:
+            group.sort(key=lambda event: event.start)
+
+    return groups
 
 
 def split_broken_groups(groups, min_auto_group_size):
