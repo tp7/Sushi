@@ -353,11 +353,13 @@ def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts
             processed.add(idx)
         else:
             group = [event]
+            group_end = event.end
             i = idx+1
-            while i < len(events) and abs(events[i].start - group[-1].end) < max_ts_distance:
+            while i < len(events) and abs(group_end - events[i].start) < max_ts_distance:
                 if events[i].end < next_chapter and events[i].duration <= max_ts_duration:
                     processed.add(i)
                     group.append(events[i])
+                    group_end = max(group_end, events[i].end)
                 i += 1
 
             search_groups.append(group)
@@ -386,9 +388,10 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
             try:
                 event.link_event(events[idx + 1])
             except IndexError:
-                event.link_event(events[idx - 1])
+                event.link_event(next(x for x in reversed(events[:idx]) if not x.linked))
             continue
 
+        # link lines with start and end times identical to some other event
         # assuming scripts are sorted by start time so we don't search the entire collection
         same_start = lambda x: event.start == x.start
         processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end),None)
@@ -401,11 +404,13 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
 
     search_groups = merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts_distance)
 
+    # link groups contained inside other groups to the larger group
     passed_groups = []
     for idx, group in enumerate(search_groups):
         try:
-            other = next(
-                x for x in reversed(search_groups[:idx]) if x[0].start <= group[0].start and x[-1].end >= group[-1].end)
+            other = next(x for x in reversed(search_groups[:idx])
+                         if x[0].start <= group[0].start
+                         and x[-1].end >= group[-1].end)
             for event in group:
                 event.link_event(other[0])
         except StopIteration:
@@ -436,7 +441,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
                                                        end_time=start_point + small_window)
 
         # checking if times are close enough to last shift - no point in re-searching with full window if it's in the same group
-        if not new_time or abs_diff(new_time - original_time, last_shift) > ALLOWED_ERROR:
+        if new_time is None or abs_diff(new_time - original_time, last_shift) > ALLOWED_ERROR:
             diff, new_time = dst_stream.find_substream(tv_audio,
                                                        start_time=start_point - window,
                                                        end_time=start_point + window)
