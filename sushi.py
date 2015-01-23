@@ -367,11 +367,8 @@ def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts
     return search_groups
 
 
-def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_ts_duration,
-                     max_ts_distance):
-    small_window = 1.5
-    last_shift = 0
-
+def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_window,
+                     rewind_thresh, max_ts_duration, max_ts_distance):
     for idx, event in enumerate(events):
         if event.is_comment:
             try:
@@ -416,7 +413,12 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
         except StopIteration:
             passed_groups.append(group)
 
-    for idx, search_group in enumerate(passed_groups):
+    small_window = 1.5
+    last_shift = 0
+    consecutive_changes = 0
+    idx = 0
+    while idx < len(passed_groups):
+        search_group = passed_groups[idx]
         tv_audio = src_stream.get_substream(search_group[0].start, search_group[-1].end)
 
         original_time = search_group[0].start
@@ -431,6 +433,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
                     for e in search_group:
                         e.link_event(link_to)
                     break
+            idx += 1
             continue
 
         # searching with smaller window
@@ -445,6 +448,9 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
             diff, new_time = dst_stream.find_substream(tv_audio,
                                                        start_time=start_point - window,
                                                        end_time=start_point + window)
+            consecutive_changes += 1
+        else:
+            consecutive_changes = 0
 
         last_shift = time_offset = new_time - original_time
 
@@ -452,6 +458,18 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
             e.set_shift(time_offset, diff)
         logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
                       .format(format_time(search_group[0].start), format_time(search_group[-1].end), time_offset, diff))
+
+        if rewind_thresh > 0 and consecutive_changes > rewind_thresh and window < max_window:
+            window += (max_window - window) / 2
+            idx -= rewind_thresh
+            last_shift = passed_groups[idx][-1].shift
+            consecutive_changes = 0
+            logging.warn("Detected possibly broken segment starting at {0}, rewinding to shift {1} "
+                         "and trying larger window ({2})"
+                         .format(format_time(passed_groups[idx][0].start), round(last_shift, 4), window))
+            continue
+
+        idx += 1
 
 
 def check_file_exists(path, file_title):
@@ -596,6 +614,8 @@ def run(args):
         calculate_shifts(src_stream, dst_stream, script.events,
                          chapter_times=chapter_times,
                          window=args.window,
+                         max_window=args.max_window,
+                         rewind_thresh=args.rewind_thresh if args.grouping else 0,
                          max_ts_duration=args.max_ts_duration,
                          max_ts_distance=args.max_ts_distance)
 
@@ -669,8 +689,13 @@ def create_arg_parser():
 
     parser.add_argument('--window', default=10, type=int, metavar='<size>', dest='window',
                         help='Search window size')
+    parser.add_argument('--max-window', default=30, type=int, metavar='<size>', dest='max_window',
+                        help="Maximum search size Sushi is allowed to use when trying to recover from errors")
+    parser.add_argument('--rewind-thresh', default=5, type=int, metavar='<events>', dest='rewind_thresh',
+                        help="Number of consecutive errors Sushi has to encounter to consider results broken "
+                             "and retry with larger window. Set to 0 to disable")
     parser.add_argument('--no-grouping', action='store_false', dest='grouping',
-                        help='Split events into groups before shifting')
+                        help="Don't events into groups before shifting. Also disables error recovery.")
     parser.add_argument('--min-group-size', default=1, type=int, metavar='<events>', dest='min_group_size',
                         help='Minimum size of automatic group')
     parser.add_argument('--max-kf-distance', default=2, type=float, metavar='<frames>', dest='max_kf_distance',
