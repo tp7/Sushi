@@ -460,7 +460,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
                       .format(format_time(search_group[0].start), format_time(search_group[-1].end), time_offset, diff))
 
         if rewind_thresh > 0 and consecutive_changes > rewind_thresh and window < max_window:
-            window += (max_window - window) / 2
+            window = max_window
             idx -= rewind_thresh
             last_shift = passed_groups[idx][-1].shift
             consecutive_changes = 0
