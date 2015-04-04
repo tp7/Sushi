@@ -94,16 +94,12 @@ def compare_scripts(ideal_path, test_path, timecodes, test_name, expected_errors
 
 def run_test(base_path, plots_path, test_name, params):
     def safe_add_key(args, key, name):
-        try:
+        if name in params:
             args.extend((key, str(params[name])))
-        except KeyError:
-            pass
 
     def safe_add_path(args, folder, key, name):
-        try:
+        if name in params:
             args.extend((key, os.path.join(folder, params[name])))
-        except KeyError:
-            pass
 
     logging.info('Testing "{0}"'.format(test_name))
 

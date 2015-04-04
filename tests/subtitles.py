@@ -104,7 +104,7 @@ class AssScriptTestCase(ScriptTestBase):
     def test_write_to_file(self):
         styles = ["Style: Default,Open Sans Semibold,36,&H00FFFFFF,&H000000FF,&H00020713,&H00000000,-1,0,0,0,100,100,0,0,1,1.7,0,2,0,0,28,1"]
         events = [AssEvent(ASS_EVENT), AssEvent(ASS_EVENT)]
-        AssScript([], styles, events).save_to_file(self.script_path)
+        AssScript([], styles, events, None).save_to_file(self.script_path)
 
         with codecs.open(self.script_path, encoding='utf-8-sig') as script:
             text = script.read()

@@ -1,5 +1,7 @@
 import codecs
 import os
+import re
+from collections import OrderedDict
 from common import SushiError, format_time
 
 
@@ -173,25 +175,42 @@ class AssEvent(ScriptEventBase):
 
 
 class AssScript(ScriptBase):
-    def __init__(self, script_info, styles, events):
+    def __init__(self, script_info, styles, events, other):
         super(AssScript, self).__init__()
         self.script_info = script_info
         self.styles = styles
         self.events = events
+        self.other = other
 
     @classmethod
     def from_file(cls, path):
         script_info, styles, events = [], [], []
+        other_sections = OrderedDict()
 
-        parse_script_info_line = lambda x: script_info.append(x)
-        parse_styles_line = lambda x: styles.append(x)
-        parse_event_line = lambda x: events.append(AssEvent(x))
+        def parse_script_info_line(line):
+            if line.startswith(u'Format:'):
+                return
+            script_info.append(line)
+
+        def parse_styles_line(line):
+            if line.startswith(u'Format:'):
+                return
+            styles.append(line)
+
+        def parse_event_line(line):
+            if line.startswith(u'Format:'):
+                return
+            events.append(AssEvent(line))
+
+        def create_generic_parse(section_name):
+            other_sections[section_name] = []
+            return lambda x: other_sections[section_name].append(x)
 
         parse_function = None
 
         try:
             with codecs.open(path, encoding='utf-8-sig') as script:
-                for line in script:
+                for line_idx, line in enumerate(script):
                     line = line.strip()
                     if not line:
                         continue
@@ -202,20 +221,20 @@ class AssScript(ScriptBase):
                         parse_function = parse_styles_line
                     elif low == u'[events]':
                         parse_function = parse_event_line
-                    elif low.startswith(u'format:'):
-                        continue  # ignore it
+                    elif re.match(r'\[.+?\]', low):
+                        parse_function = create_generic_parse(line)
                     elif not parse_function:
                         raise SushiError("That's some invalid ASS script")
                     else:
                         try:
                             parse_function(line)
                         except Exception as e:
-                            raise SushiError("That's some invalid ASS script: {0}".format(e.message))
+                            raise SushiError("That's some invalid ASS script: {0} [line {1}]".format(e.message, line_idx))
         except IOError:
             raise SushiError("Script {0} not found".format(path))
         for idx, event in enumerate(events):
             event.source_index = idx
-        return cls(script_info, styles, events)
+        return cls(script_info, styles, events, other_sections)
 
     def save_to_file(self, path):
         # if os.path.exists(path):
@@ -237,6 +256,12 @@ class AssScript(ScriptBase):
             lines.append(u'[Events]')
             lines.append(u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
             lines.extend(map(unicode, events))
+
+        if self.other:
+            for section_name, section_lines in self.other.iteritems():
+                lines.append('')
+                lines.append(section_name)
+                lines.extend(section_lines)
 
         with codecs.open(path, encoding='utf-8-sig', mode='w') as script:
             script.write(unicode(os.linesep).join(lines))
