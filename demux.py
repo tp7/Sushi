@@ -57,14 +57,18 @@ class FFmpeg(object):
 
     @staticmethod
     def _get_audio_streams(info):
-        streams = re.findall(r'Stream #0:(\d+).*?Audio:\s*(.*?(?:\((default)\))?)\r?\n(?:\s*Metadata:\s*\r?\n\s*title\s*:\s*(.*?)\r?\n)?',
-                             info)
+        streams = re.findall(r'Stream\s\#0:(\d+).*?Audio:\s*(.*?(?:\((default)\))?)\s*?(?:\(forced\))?\r?\n'
+                             r'(?:\s*Metadata:\s*\r?\n'
+                             r'\s*title\s*:\s*(.*?)\r?\n)?',
+                             info, flags=re.VERBOSE)
         return [MediaStreamInfo(int(x[0]), x[1], x[2] != '', x[3]) for x in streams]
 
     @staticmethod
     def _get_video_streams(info):
-        streams = re.findall(r'Stream #0:(\d+).*?Video:\s*(.*?(?:\((default)\))?)\r?\n(?:\s*Metadata:\s*\r?\n\s*title\s*:\s*(.*?)\r?\n)?',
-                             info)
+        streams = re.findall(r'Stream\s\#0:(\d+).*?Video:\s*(.*?(?:\((default)\))?)\s*?(?:\(forced\))?\r?\n'
+                             r'(?:\s*Metadata:\s*\r?\n'
+                             r'\s*title\s*:\s*(.*?)\r?\n)?',
+                             info, flags=re.VERBOSE)
         return [MediaStreamInfo(int(x[0]), x[1], x[2] != '', x[3]) for x in streams]
 
     @staticmethod
@@ -79,9 +83,10 @@ class FFmpeg(object):
             'subrip': '.srt'
         }
 
-        streams = re.findall(
-            r'Stream\s#0:(\d+).*?Subtitle:\s*((\w*)\s*?(?:\((default)\))?)\r?\n(?:\s*Metadata:\s*\r?\n\s*title\s*:\s*(.*?)\r?\n)?',
-            info)
+        streams = re.findall(r'Stream\s\#0:(\d+).*?Subtitle:\s*((\w*)\s*?(?:\((default)\))?\s*?(?:\(forced\))?)\r?\n'
+                             r'(?:\s*Metadata:\s*\r?\n'
+                             r'\s*title\s*:\s*(.*?)\r?\n)?',
+                             info, flags=re.VERBOSE)
         return [SubtitlesStreamInfo(int(x[0]), x[1], maps.get(x[2], x[2]), x[3] != '', x[4].strip()) for x in streams]
 
     @classmethod

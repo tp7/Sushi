@@ -18,13 +18,13 @@ class FFmpegTestCase(unittest.TestCase):
         Stream #0:0(jpn): Video: h264 (High 10), yuv420p10le, 1280x720 [SAR 1:1 DAR 16:9], 23.98 fps, 23.98 tbr, 1k tbn, 47.95 tbc (default)
         Metadata:
           title           : Video 10bit
-        Stream #0:1(jpn): Audio: aac, 48000 Hz, stereo, fltp (default)
+        Stream #0:1(jpn): Audio: aac, 48000 Hz, stereo, fltp (default) (forced)
         Metadata:
           title           : Audio AAC 2.0
         Stream #0:2(eng): Audio: aac, 48000 Hz, stereo, fltp
         Metadata:
           title           : English Audio AAC 2.0
-        Stream #0:3(eng): Subtitle: ssa (default)
+        Stream #0:3(eng): Subtitle: ssa (default) (forced)
         Metadata:
           title           : English Subtitles
         Stream #0:4(enm): Subtitle: ass
