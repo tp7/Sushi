@@ -6,7 +6,7 @@ import struct
 import math
 from time import time
 import os.path
-from common import SushiError
+from common import SushiError, clip
 
 WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_EXTENSIBLE = 0xFFFE
@@ -103,6 +103,7 @@ class DownmixedWavFile(object):
 
 class WavStream(object):
     READ_CHUNK_SIZE = 1  # one second, seems to be the fastest
+    PADDING_SECONDS = 10
 
     def __init__(self, path, sample_rate=12000, sample_type='uint8'):
         if sample_type not in ('float32', 'uint8'):
@@ -114,12 +115,13 @@ class WavStream(object):
 
         self.sample_count = math.ceil(total_seconds * sample_rate)
         self.sample_rate = sample_rate
-        self.data = np.empty((1, self.sample_count), np.float32)
-
+        # pre-allocating the data array and some place for padding
+        self.data = np.empty((1, self.PADDING_SECONDS * 2 * file.framerate + self.sample_count), np.float32)
+        self.padding_size = 10 * file.framerate
         before_read = time()
         try:
             seconds_read = 0
-            samples_read = 0
+            samples_read = self.padding_size
             while seconds_read < total_seconds:
                 data = file.readframes(int(self.READ_CHUNK_SIZE * file.framerate))
                 new_length = int(round(len(data) * downsample_rate))
@@ -133,6 +135,10 @@ class WavStream(object):
                 np.copyto(dst_view, data, casting='no')
                 samples_read += new_length
                 seconds_read += self.READ_CHUNK_SIZE
+
+            # padding the audio from both sides
+            self.data[0][0:self.padding_size].fill(self.data[0][self.padding_size])
+            self.data[0][-self.padding_size:].fill(self.data[0][-self.padding_size-1])
 
             # normalizing
             # also clipping the stream by 3*median value from both sides of zero
@@ -160,19 +166,20 @@ class WavStream(object):
         return self.sample_count / self.sample_rate
 
     def get_substream(self, start, end):
-        start_off = self.to_number_of_samples(start)
-        end_off = self.to_number_of_samples(end)
+        start_off = self._get_sample_for_time(start)
+        end_off = self._get_sample_for_time(end)
         return self.data[:, start_off:end_off]
 
-    def to_number_of_samples(self, time):
-        return int(self.sample_rate * time)
+    def _get_sample_for_time(self, timestamp):
+        # this function gets REAL sample for time, taking padding into account
+        return int(self.sample_rate * timestamp) + self.padding_size
 
-    def find_substream(self, pattern, **kwargs):
-        start_time = max(kwargs.get('start_time', 0.0), 0.0)
-        end_time = max(kwargs.get('end_time', self.sample_count), 0.0)
+    def find_substream(self, pattern, start_time, end_time):
+        start_time = clip(start_time, -self.PADDING_SECONDS, self.duration_seconds)
+        end_time = clip(end_time, 0, self.duration_seconds + self.PADDING_SECONDS)
 
-        start_sample = self.to_number_of_samples(start_time)
-        end_sample = self.to_number_of_samples(end_time) + len(pattern[0])
+        start_sample = self._get_sample_for_time(start_time)
+        end_sample = self._get_sample_for_time(end_time) + len(pattern[0])
 
         search_source = self.data[:, start_sample:end_sample]
         result = cv2.matchTemplate(search_source, pattern, cv2.TM_SQDIFF_NORMED)

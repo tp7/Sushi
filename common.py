@@ -27,3 +27,7 @@ def format_time(seconds):
             int((cs // 6000) % 60),
             int((cs // 100) % 60),
             int(cs % 100))
+
+
+def clip(value, minimum, maximum):
+    return max(min(value, maximum), minimum)
