@@ -1,10 +1,5 @@
 #!/usr/bin/env python
 import logging
-from common import SushiError, get_extension, format_time, ensure_static_collection
-from demux import Timecodes, Demuxer
-from keyframes import parse_keyframes
-from subs import AssScript, SrtScript
-from wav import WavStream
 import sys
 from itertools import takewhile, izip
 import numpy as np
@@ -13,6 +8,13 @@ import chapters
 import os
 from time import time
 import bisect
+
+from common import SushiError, get_extension, format_time, ensure_static_collection
+from demux import Timecodes, Demuxer
+from keyframes import parse_keyframes
+from subs import AssScript, SrtScript
+from wav import WavStream
+
 
 try:
     import matplotlib.pyplot as plt
@@ -556,6 +558,7 @@ def run(args):
                 chapter_times = chapters.get_ogm_start_times(args.chapters_file)
         elif not src_demuxer.is_wav:
             chapter_times = src_demuxer.chapters
+            src_demuxer.set_chapters(output_path=src_demuxer.path + ".sushi.chapters.txt")
         else:
             chapter_times = []
     else:

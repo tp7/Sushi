@@ -3,6 +3,7 @@ import mock
 
 from demux import FFmpeg, MkvToolnix, SCXviD
 from common import SushiError
+import chapters
 
 
 def create_popen_mock():
@@ -124,3 +125,59 @@ class SCXviDTestCase(unittest.TestCase):
         popen_mock.side_effect = raise_no_app
         self.assertRaisesRegexp(SushiError, '[sS][cC][xX][vV][iI][dD]',
                                 lambda: SCXviD.make_keyframes('video.mkv', 'keyframes.txt'))
+
+
+class ExternalChaptersTestCase(unittest.TestCase):
+    def test_parse_xml_start_times(self):
+        file_text = """<?xml version="1.0"?>
+<!-- <!DOCTYPE Chapters SYSTEM "matroskachapters.dtd"> -->
+<Chapters>
+  <EditionEntry>
+    <EditionUID>2092209815</EditionUID>
+    <ChapterAtom>
+      <ChapterUID>3122448259</ChapterUID>
+      <ChapterTimeStart>00:00:00.000000000</ChapterTimeStart>
+      <ChapterDisplay>
+        <ChapterString>Prologue</ChapterString>
+      </ChapterDisplay>
+    </ChapterAtom>
+    <ChapterAtom>
+      <ChapterUID>998777246</ChapterUID>
+      <ChapterTimeStart>00:00:17.017000000</ChapterTimeStart>
+      <ChapterDisplay>
+        <ChapterString>Opening Song ("YES!")</ChapterString>
+      </ChapterDisplay>
+    </ChapterAtom>
+    <ChapterAtom>
+      <ChapterUID>55571857</ChapterUID>
+      <ChapterTimeStart>00:01:47.023000000</ChapterTimeStart>
+      <ChapterDisplay>
+        <ChapterString>Part A (Tale of the Doggypus)</ChapterString>
+      </ChapterDisplay>
+    </ChapterAtom>
+  </EditionEntry>
+</Chapters>
+"""
+        parsed_times = chapters.parse_xml_start_times(file_text)
+        self.assertEqual(parsed_times, [0, 17.017, 107.023])
+
+    def test_parse_ogm_start_times(self):
+        file_text = """CHAPTER01=00:00:00.000
+CHAPTER01NAME=Prologue
+CHAPTER02=00:00:17.017
+CHAPTER02NAME=Opening Song ("YES!")
+CHAPTER03=00:01:47.023
+CHAPTER03NAME=Part A (Tale of the Doggypus)
+"""
+        parsed_times = chapters.parse_ogm_start_times(file_text)
+        self.assertEqual(parsed_times, [0, 17.017, 107.023])
+
+    def test_format_ogm_chapters(self):
+        chapters_text = chapters.format_ogm_chapters(start_times=[0, 17.017, 107.023])
+        self.assertEqual(chapters_text, """CHAPTER01=00:00:00.000
+CHAPTER01NAME=
+CHAPTER02=00:00:17.017
+CHAPTER02NAME=
+CHAPTER03=00:01:47.023
+CHAPTER03NAME=
+""")

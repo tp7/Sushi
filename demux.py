@@ -4,7 +4,9 @@ import subprocess
 from collections import namedtuple
 import logging
 import bisect
+
 from common import SushiError, get_extension
+import chapters
 
 MediaStreamInfo = namedtuple('MediaStreamInfo', ['id', 'info', 'default', 'title'])
 SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', 'default', 'title'])
@@ -228,7 +230,7 @@ class Demuxer(object):
         self._path = path
         self._is_wav = get_extension(self._path) == '.wav'
         self._mi = None if self._is_wav else FFmpeg.get_media_info(self._path)
-        self._demux_audio = self._demux_subs = self._make_timecodes = self._make_keyframes = False
+        self._demux_audio = self._demux_subs = self._make_timecodes = self._make_keyframes = self._write_chapters = False
 
     @property
     def is_wav(self):
@@ -263,6 +265,10 @@ class Demuxer(object):
         self._timecodes_output_path = output_path
         self._make_timecodes = True
 
+    def set_chapters(self, output_path):
+        self._write_chapters = True
+        self._chapters_output_path = output_path
+
     def set_keyframes(self, output_path):
         self._keyframes_output_path = output_path
         self._make_keyframes = True
@@ -271,6 +277,10 @@ class Demuxer(object):
         return self._select_stream(self._mi.subtitles, stream_idx, 'subtitles').type
 
     def demux(self):
+        if self._write_chapters:
+            with open(self._chapters_output_path, "w") as output_file:
+                output_file.write(chapters.format_ogm_chapters(self.chapters))
+
         if self._make_keyframes:
             SCXviD.make_keyframes(self._path, self._keyframes_output_path)
 
@@ -311,6 +321,8 @@ class Demuxer(object):
             os.remove(self._script_output_path)
         if self._make_timecodes:
             os.remove(self._timecodes_output_path)
+        if self._write_chapters:
+            os.remove(self._chapters_output_path)
 
     @classmethod
     def _format_stream(cls, stream):

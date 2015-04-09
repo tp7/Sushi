@@ -2,7 +2,7 @@ import codecs
 import os
 import re
 from collections import OrderedDict
-from common import SushiError, format_time
+from common import SushiError, format_time, format_srt_time
 
 
 def _parse_ass_time(string):
@@ -111,12 +111,7 @@ class SrtEvent(ScriptEventBase):
 
     @staticmethod
     def _format_time(seconds):
-        cs = round(seconds * 1000)
-        return u'{0:02d}:{1:02d}:{2:02d},{3:03d}'.format(
-            int(cs // 3600000),
-            int((cs // 60000) % 60),
-            int((cs // 1000) % 60),
-            int(cs % 1000))
+        return format_srt_time(seconds)
 
 
 class SrtScript(ScriptBase):
