@@ -479,7 +479,7 @@ def check_file_exists(path, file_title):
         raise SushiError("{0} file doesn't exist".format(file_title))
 
 def join_to_temp_dir(args, path, prefix):
-    if args.temp_dir and args.cleanup is False:
+    if args.temp_dir:
         return os.path.join(args.temp_dir, os.path.basename(path) + prefix)
     else:
         return path + prefix    
@@ -748,7 +748,7 @@ def create_arg_parser():
     parser.add_argument('--no-cleanup', action='store_false', dest='cleanup',
                         help="Don't delete demuxed streams")
     parser.add_argument('--temp-dir', default=None, dest='temp_dir', metavar='<string>',
-                        help='Specify temporary folder to use when demuxing stream. \'--no-cleanup\' option must be enabled')
+                        help='Specify temporary folder to use when demuxing stream.')
     parser.add_argument('--chapters', default=None, dest='chapters_file', metavar='<filename>',
                         help="XML or OGM chapters to use instead of any found in the source. 'none' to disable.")
     parser.add_argument('--script', default=None, dest='script_file', metavar='<filename>',
