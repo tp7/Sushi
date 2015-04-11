@@ -478,11 +478,18 @@ def check_file_exists(path, file_title):
     if path and not os.path.exists(path):
         raise SushiError("{0} file doesn't exist".format(file_title))
 
-def join_to_temp_dir(args, path, prefix):
-    if args.temp_dir:
-        return os.path.join(args.temp_dir, os.path.basename(path) + prefix)
+
+def format_full_path(temp_dir, base_path, postfix):
+    if temp_dir:
+        return os.path.join(temp_dir, os.path.basename(base_path) + postfix)
     else:
-        return path + prefix    
+        return base_path + postfix
+
+
+def create_directory_if_not_exists(path):
+    if path and not os.path.exists(path):
+        os.makedirs(path)
+
 
 def run(args):
     ignore_chapters = args.chapters_file is not None and args.chapters_file.lower() == 'none'
@@ -518,23 +525,20 @@ def run(args):
     if (args.src_keyframes and not args.dst_keyframes) or (args.dst_keyframes and not args.src_keyframes):
         raise SushiError('Either none or both of src and dst keyframes should be provided')
 
-    # create temporary directory if not exist
-    if args.temp_dir:
-        if not os.path.exists(args.temp_dir):
-            os.makedirs(args.temp_dir)
+    create_directory_if_not_exists(args.temp_dir)
 
     # selecting source audio
     if src_demuxer.is_wav:
         src_audio_path = args.source
     else:
-        src_audio_path = join_to_temp_dir(args, args.source, '.sushi.wav')
+        src_audio_path = format_full_path(args.temp_dir, args.source, '.sushi.wav')
         src_demuxer.set_audio(stream_idx=args.src_audio_idx, output_path=src_audio_path, sample_rate=args.sample_rate)
 
     # selecting destination audio
     if dst_demuxer.is_wav:
         dst_audio_path = args.destination
     else:
-        dst_audio_path = join_to_temp_dir(args, args.destination, '.sushi.wav')    
+        dst_audio_path = format_full_path(args.temp_dir, args.destination, '.sushi.wav')
         dst_demuxer.set_audio(stream_idx=args.dst_audio_idx, output_path=dst_audio_path, sample_rate=args.sample_rate)
 
     # selecting source subtitles
@@ -542,7 +546,7 @@ def run(args):
         src_script_path = args.script_file
     else:
         stype = src_demuxer.get_subs_type(args.src_script_idx)
-        src_script_path = join_to_temp_dir(args, args.source, '.sushi'+ stype)
+        src_script_path = format_full_path(args.temp_dir, args.source, '.sushi'+ stype)
         src_demuxer.set_script(stream_idx=args.src_script_idx, output_path=src_script_path)
 
     script_extension = get_extension(src_script_path)
@@ -557,8 +561,7 @@ def run(args):
             raise SushiError("Source and destination script file types don't match ({0} vs {1})"
                              .format(script_extension, dst_script_extension))
     else:
-        dst_script_path = join_to_temp_dir(args,args.destination, '.sushi' + script_extension)
-
+        dst_script_path = format_full_path(args.temp_dir, args.destination, '.sushi' + script_extension)
 
     # selecting chapters
     if args.grouping and not ignore_chapters:
@@ -569,7 +572,7 @@ def run(args):
                 chapter_times = chapters.get_ogm_start_times(args.chapters_file)
         elif not src_demuxer.is_wav:
             chapter_times = src_demuxer.chapters
-            output_path = join_to_temp_dir(args, src_demuxer.path, ".sushi.chapters.txt")                   
+            output_path = format_full_path(args.temp_dir, src_demuxer.path, ".sushi.chapters.txt")
             src_demuxer.set_chapters(output_path)
         else:
             chapter_times = []
@@ -579,7 +582,7 @@ def run(args):
     # selecting keyframes and timecodes
     if args.src_keyframes:
         def select_keyframes(file_arg, demuxer):
-            auto_file = join_to_temp_dir(args, demuxer.path, '.sushi.keyframes.txt')
+            auto_file = format_full_path(args.temp_dir, demuxer.path, '.sushi.keyframes.txt')
             if file_arg in ('auto', 'make'):
                 if file_arg == 'make' or not os.path.exists(auto_file):
                     if not demuxer.has_video:
@@ -596,7 +599,7 @@ def run(args):
             elif fps_arg:
                 return None
             elif demuxer.has_video:
-                path = join_to_temp_dir(args, demuxer.path, '.sushi.timecodes.txt')
+                path = format_full_path(args.temp_dir, demuxer.path, '.sushi.timecodes.txt')
                 demuxer.set_timecodes(output_path=path)
                 return path
             else:
@@ -723,11 +726,11 @@ def create_arg_parser():
     # 10 frames at 23.976
     parser.add_argument('--max-ts-duration', default=1001.0 / 24000.0 * 10, type=float, metavar='<seconds>',
                         dest='max_ts_duration',
-                        help='Maximum duration of a line to be considered typesetting. [%(default)s]')
+                        help='Maximum duration of a line to be considered typesetting. [%(default).3f]')
     # 10 frames at 23.976
     parser.add_argument('--max-ts-distance', default=1001.0 / 24000.0 * 10, type=float, metavar='<seconds>',
                         dest='max_ts_distance',
-                        help='Maximum distance between two adjacent typesetting lines to be merged. [%(default)s]')
+                        help='Maximum distance between two adjacent typesetting lines to be merged. [%(default).3f]')
 
     parser.add_argument('--test-write-avs', action='store_true', dest='write_avs', help=argparse.SUPPRESS)
     parser.add_argument('--test-shift-plot', default=None, dest='plot_path', help=argparse.SUPPRESS)
