@@ -7,7 +7,7 @@ Imagine you've got a subtitle file synced to one video file, but you want to use
 The purpose of this script is to avoid all the hassle of manual syncing. It attempts to synchronize subtitles by finding similarities in audio streams. The script is very fast and can be used right when you want to watch something.
 
 ### Downloads
-The latest binary release can always be found in the [releases][1] section. You need the green button on the top entry.
+The latest Windows binary release can always be found in the [releases][1] section. You need the 7z archive in the top entry.
 
 ### How it works
 You need to provide two audio files and a subtitle file that matches one of those files. For every line of the subtitles, the script will extract corresponding audio from the source audio stream and will try to find the closest similar pattern in the destination audio stream, obtaining a shift value which is later applied to the subtitles.
