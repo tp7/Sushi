@@ -330,7 +330,7 @@ class Demuxer(object):
 
     @classmethod
     def _format_streams_list(cls, streams):
-        return '\n'.join(map(cls._format_streams_list, streams))
+        return '\n'.join(map(cls._format_stream, streams))
 
     def _select_stream(self, streams, chosen_idx, name):
         if not streams:
