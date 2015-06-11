@@ -20,6 +20,7 @@ class ScriptEventBase(object):
         self._linked_event = None
         self._start_shift = 0
         self._end_shift = 0
+        self.source_index = 0
 
     @property
     def shift(self):
@@ -89,25 +90,44 @@ class ScriptBase(object):
     def sort_by_time(self):
         self.events.sort(key=lambda x: x.start)
 
+    def remember_ordering(self):
+        for idx, event in enumerate(self.events):
+            # 1-based for srt, ass doesn't use them for anything but sorting anyway
+            event.source_index = idx + 1
+
 
 class SrtEvent(ScriptEventBase):
-    def __init__(self, text):
-        parse_time = lambda x: _parse_ass_time(x.replace(',', '.'))
+    EVENT_REGEX = re.compile("""
+                               (\d+?). # line-number
+                               (\d{1,2}:\d{1,2}:\d{1,2},\d+)\s-->\s(\d{1,2}:\d{1,2}:\d{1,2},\d+).  # timestamp
+                               (.+?) # actual text
+                           (?= # lookahead for the next line or end of the file
+                               (?:\d+?. # line-number
+                               \d{1,2}:\d{1,2}:\d{1,2},\d+\s-->\s\d{1,2}:\d{1,2}:\d{1,2},\d+) # timestamp
+                               |$
+                           )""", flags=re.VERBOSE | re.DOTALL)
 
-        lines = text.split('\n', 2)
-        times = lines[1].split('-->')
-        start = parse_time(times[0].rstrip())
-        end = parse_time(times[1].lstrip())
-
+    def __init__(self, idx, start, end, text):
         super(SrtEvent, self).__init__(start, end)
-        self.idx = int(lines[0])
-        self.text = lines[2]
+        self.source_index = idx
+        self.text = text
         self.style = None
         self.is_comment = False
 
+    @classmethod
+    def from_string(cls, text):
+        match = cls.EVENT_REGEX.match(text)
+        start = cls.parse_time(match.group(2))
+        end = cls.parse_time(match.group(3))
+        return SrtEvent(int(match.group(1)), start, end, match.group(4).strip())
+
     def __unicode__(self):
-        return u'{0}\n{1} --> {2}\n{3}'.format(self.idx, self._format_time(self.start),
+        return u'{0}\n{1} --> {2}\n{3}'.format(self.source_index, self._format_time(self.start),
                                                self._format_time(self.end), self.text)
+
+    @staticmethod
+    def parse_time(time_string):
+        return _parse_ass_time(time_string.replace(',', '.'))
 
     @staticmethod
     def _format_time(seconds):
@@ -123,7 +143,17 @@ class SrtScript(ScriptBase):
     def from_file(cls, path):
         try:
             with codecs.open(path, encoding='utf-8-sig') as script:
-                return cls([SrtEvent(x) for x in script.read().replace(os.linesep, '\n').split('\n\n') if x])
+                text = script.read()
+                events_list = []
+                for match in SrtEvent.EVENT_REGEX.finditer(text):
+                    event = SrtEvent(
+                        idx=int(match.group(1)),
+                        start=SrtEvent.parse_time(match.group(2)),
+                        end=SrtEvent.parse_time(match.group(3)),
+                        text=match.group(4).strip()
+                    )
+                    events_list.append(event)
+                return cls(events_list)
         except IOError:
             raise SushiError("Script {0} not found".format(path))
 
@@ -176,6 +206,7 @@ class AssScript(ScriptBase):
         self.styles = styles
         self.events = events
         self.other = other
+        self.remember_ordering()
 
     @classmethod
     def from_file(cls, path):
@@ -227,8 +258,6 @@ class AssScript(ScriptBase):
                             raise SushiError("That's some invalid ASS script: {0} [line {1}]".format(e.message, line_idx))
         except IOError:
             raise SushiError("Script {0} not found".format(path))
-        for idx, event in enumerate(events):
-            event.source_index = idx
         return cls(script_info, styles, events, other_sections)
 
     def save_to_file(self, path):
