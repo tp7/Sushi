@@ -714,8 +714,6 @@ def create_arg_parser():
                              "and retry with larger window. Set to 0 to disable. [%(default)s]")
     parser.add_argument('--no-grouping', action='store_false', dest='grouping',
                         help="Don't events into groups before shifting. Also disables error recovery.")
-    parser.add_argument('--min-group-size', default=1, type=int, metavar='<events>', dest='min_group_size',
-                        help='Minimum size of automatic group. [%(default)s]')
     parser.add_argument('--max-kf-distance', default=2, type=float, metavar='<frames>', dest='max_kf_distance',
                         help='Maximum keyframe snapping distance. [%(default)s]')
     parser.add_argument('--kf-mode', default='all', choices=['shift', 'snap', 'all'], dest='kf_mode',
@@ -732,14 +730,16 @@ def create_arg_parser():
                         dest='max_ts_distance',
                         help='Maximum distance between two adjacent typesetting lines to be merged. [%(default).3f]')
 
+    # deprecated/test options, do not use
+    parser.add_argument('--min-group-size', default=1, type=int, metavar='<events>', dest='min_group_size',
+                        help=argparse.SUPPRESS)
     parser.add_argument('--test-write-avs', action='store_true', dest='write_avs', help=argparse.SUPPRESS)
     parser.add_argument('--test-shift-plot', default=None, dest='plot_path', help=argparse.SUPPRESS)
+    parser.add_argument('--sample-type', default='uint8', choices=['float32', 'uint8'], dest='sample_type',
+                        help=argparse.SUPPRESS)
 
-    # optimizations
     parser.add_argument('--sample-rate', default=12000, type=int, metavar='<rate>', dest='sample_rate',
                         help='Downsampled audio sample rate. [%(default)s]')
-    parser.add_argument('--sample-type', default='uint8', choices=['float32', 'uint8'], dest='sample_type',
-                        help='Downsampled audio representation type. [%(default)s]')
 
     parser.add_argument('--src-audio', default=None, type=int, metavar='<id>', dest='src_audio_idx',
                         help='Audio stream index of the source video')
