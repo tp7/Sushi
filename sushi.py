@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import logging
 import sys
+import operator
 from itertools import takewhile, izip
 import numpy as np
 import argparse
@@ -63,20 +64,28 @@ def write_shift_avs(output_path, groups, src_audio, dst_audio):
 
 def interpolate_nones(data, points):
     data = ensure_static_collection(data)
-    data_idx = [point for point, value in izip(points, data) if value is not None]
-    if not data_idx:
+    # unique values sorted by time
+    values_lookup = {p: v for p, v in izip(points, data) if v is not None}
+    if not values_lookup:
         return []
-    zero_idx = [point for point, value in izip(points, data) if value is None]
-    if not zero_idx:
+
+    zero_points = {p for p, v in izip(points, data) if v is None}
+    if not zero_points:
         return data
-    data_values = [value for value in data if value is not None]
-    out = iter(np.interp(zero_idx, data_idx, data_values))
 
-    for point, value in enumerate(data):
-        if value is None:
-            data[point] = next(out, None)
+    data_list = sorted(values_lookup.iteritems())
+    zero_points = sorted(x for x in zero_points if x not in values_lookup)
 
-    return data
+    out = np.interp(x=zero_points,
+                    xp=map(operator.itemgetter(0), data_list),
+                    fp=map(operator.itemgetter(1), data_list))
+
+    values_lookup.update(izip(zero_points, out))
+
+    return [
+        values_lookup[point] if value is None else value
+        for point, value in izip(points, data)
+    ]
 
 
 # todo: implement this as a running median

@@ -49,8 +49,7 @@ class DownmixedWavFile(object):
             if not fmt_chunk_read or not data_chink_read:
                 raise SushiError('Invalid WAV file')
         except:
-            if self._file:
-                self._file.close()
+            self.close()
             raise
 
     def __del__(self):
@@ -68,10 +67,10 @@ class DownmixedWavFile(object):
         if self.sample_width == 2:
             unpacked = np.fromstring(data, dtype=np.int16)
         elif self.sample_width == 3:
-            bytes = np.ndarray(len(data), 'int8', data)
+            raw_bytes = np.ndarray(len(data), 'int8', data)
             unpacked = np.zeros(len(data) / 3, np.int16)
-            unpacked.view(dtype='int8')[0::2] = bytes[1::3]
-            unpacked.view(dtype='int8')[1::2] = bytes[2::3]
+            unpacked.view(dtype='int8')[0::2] = raw_bytes[1::3]
+            unpacked.view(dtype='int8')[1::2] = raw_bytes[2::3]
         else:
             raise SushiError('Unsupported sample width: {0}'.format(self.sample_width))
 
@@ -109,21 +108,21 @@ class WavStream(object):
         if sample_type not in ('float32', 'uint8'):
             raise SushiError('Unknown sample type of WAV stream, must be uint8 or float32')
 
-        file = DownmixedWavFile(path)
-        total_seconds = file.frames_count / float(file.framerate)
-        downsample_rate = sample_rate / float(file.framerate)
+        stream = DownmixedWavFile(path)
+        total_seconds = stream.frames_count / float(stream.framerate)
+        downsample_rate = sample_rate / float(stream.framerate)
 
         self.sample_count = math.ceil(total_seconds * sample_rate)
         self.sample_rate = sample_rate
         # pre-allocating the data array and some place for padding
-        self.data = np.empty((1, self.PADDING_SECONDS * 2 * file.framerate + self.sample_count), np.float32)
-        self.padding_size = 10 * file.framerate
+        self.data = np.empty((1, self.PADDING_SECONDS * 2 * stream.framerate + self.sample_count), np.float32)
+        self.padding_size = 10 * stream.framerate
         before_read = time()
         try:
             seconds_read = 0
             samples_read = self.padding_size
             while seconds_read < total_seconds:
-                data = file.readframes(int(self.READ_CHUNK_SIZE * file.framerate))
+                data = stream.readframes(int(self.READ_CHUNK_SIZE * stream.framerate))
                 new_length = int(round(len(data) * downsample_rate))
 
                 dst_view = self.data[0][samples_read:samples_read+new_length]
@@ -158,7 +157,7 @@ class WavStream(object):
         except Exception as e:
             raise SushiError('Error while loading {0}: {1}'.format(path, e))
         finally:
-            file.close()
+            stream.close()
         logging.info('Done reading WAV {0} in {1}s'.format(path, time() - before_read))
 
     @property

@@ -229,8 +229,10 @@ class AssScript(ScriptBase):
             events.append(AssEvent(line))
 
         def create_generic_parse(section_name):
+            if section_name in other_sections:
+                raise SushiError("Duplicate section detected, invalid script?")
             other_sections[section_name] = []
-            return lambda x: other_sections[section_name].append(x)
+            return other_sections[section_name].append
 
         parse_function = None
 
