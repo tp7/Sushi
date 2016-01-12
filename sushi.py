@@ -64,7 +64,6 @@ def write_shift_avs(output_path, groups, src_audio, dst_audio):
 
 def interpolate_nones(data, points):
     data = ensure_static_collection(data)
-    # unique values sorted by time
     values_lookup = {p: v for p, v in izip(points, data) if v is not None}
     if not values_lookup:
         return []
@@ -378,25 +377,25 @@ def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts
     return search_groups
 
 
-def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_window,
-                     rewind_thresh, max_ts_duration, max_ts_distance):
+def prepare_search_groups(events, source_duration, chapter_times, max_ts_duration, max_ts_distance):
+    last_unlinked = None
     for idx, event in enumerate(events):
         if event.is_comment:
             try:
                 event.link_event(events[idx+1])
             except IndexError:
-                event.link_event(next(x for x in reversed(events[:idx]) if not x.linked))
+                event.link_event(last_unlinked)
             continue
-        if (event.start + event.duration / 2.0) > src_stream.duration_seconds:
+        if (event.start + event.duration / 2.0) > source_duration:
             logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
-            event.link_event(next(x for x in reversed(events[:idx]) if not x.linked))
+            event.link_event(last_unlinked)
             continue
         elif event.end == event.start:
             logging.debug('{0}: skipped because zero duration'.format(format_time(event.start)))
             try:
                 event.link_event(events[idx + 1])
             except IndexError:
-                event.link_event(next(x for x in reversed(events[:idx]) if not x.linked))
+                event.link_event(last_unlinked)
             continue
 
         # link lines with start and end times identical to some other event
@@ -405,8 +404,8 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
         processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end),None)
         if processed:
             event.link_event(processed)
-            # logging.debug('{0}-{1}: skipped because identical to already processed (typesetting?)'
-            # .format(format_time(event.start), format_time(event.end)))
+        else:
+            last_unlinked = event
 
     events = (e for e in events if not e.linked)
 
@@ -423,13 +422,16 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
                 event.link_event(other[0])
         except StopIteration:
             passed_groups.append(group)
+    return passed_groups
 
+
+def calculate_shifts(src_stream, dst_stream, groups_list, window, max_window, rewind_thresh):
     small_window = 1.5
     last_shift = 0
     consecutive_changes = 0
     idx = 0
-    while idx < len(passed_groups):
-        search_group = passed_groups[idx]
+    while idx < len(groups_list):
+        search_group = groups_list[idx]
         tv_audio = src_stream.get_substream(search_group[0].start, search_group[-1].end)
 
         original_time = search_group[0].start
@@ -438,7 +440,7 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
         # make sure we don't crash because lines aren't present in the destination stream
         if start_point > dst_stream.duration_seconds:
             logging.info('Search start point is larger than dst stream duration, ignoring: %s' % unicode(search_group[0]))
-            for group in reversed(passed_groups[:idx]):
+            for group in reversed(groups_list[:idx]):
                 link_to = next((x for x in reversed(group) if not x.linked), None)
                 if link_to:
                     for e in search_group:
@@ -450,34 +452,30 @@ def calculate_shifts(src_stream, dst_stream, events, chapter_times, window, max_
         # searching with smaller window
         diff = new_time = None
         if small_window < window:
-            diff, new_time = dst_stream.find_substream(tv_audio,
-                                                       start_time=start_point - small_window,
-                                                       end_time=start_point + small_window)
+            diff, new_time = dst_stream.find_substream(tv_audio, start_point, small_window)
 
         # checking if times are close enough to last shift - no point in re-searching with full window if it's in the same group
         if new_time is None or abs_diff(new_time - original_time, last_shift) > ALLOWED_ERROR:
-            diff, new_time = dst_stream.find_substream(tv_audio,
-                                                       start_time=start_point - window,
-                                                       end_time=start_point + window)
+            diff, new_time = dst_stream.find_substream(tv_audio, start_point, window)
             consecutive_changes += 1
         else:
             consecutive_changes = 0
 
-        last_shift = time_offset = new_time - original_time
+        last_shift = new_time - original_time
 
         for e in search_group:
-            e.set_shift(time_offset, diff)
+            e.set_shift(last_shift, diff)
         logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
-                      .format(format_time(search_group[0].start), format_time(search_group[-1].end), time_offset, diff))
+                      .format(format_time(search_group[0].start), format_time(search_group[-1].end), last_shift, diff))
 
         if rewind_thresh > 0 and consecutive_changes > rewind_thresh and window < max_window:
             window = max_window
             idx -= rewind_thresh
-            last_shift = passed_groups[idx][-1].shift
+            last_shift = groups_list[idx][-1].shift
             consecutive_changes = 0
             logging.warn("Detected possibly broken segment starting at {0}, rewinding to shift {1} "
                          "and trying larger window ({2})"
-                         .format(format_time(passed_groups[idx][0].start), round(last_shift, 4), window))
+                         .format(format_time(groups_list[idx][0].start), round(last_shift, 4), window))
             continue
 
         idx += 1
@@ -638,13 +636,16 @@ def run(args):
         src_stream = WavStream(src_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
         dst_stream = WavStream(dst_audio_path, sample_rate=args.sample_rate, sample_type=args.sample_type)
 
-        calculate_shifts(src_stream, dst_stream, script.events,
-                         chapter_times=chapter_times,
+        search_groups = prepare_search_groups(script.events,
+                                              source_duration=src_stream.duration_seconds,
+                                              chapter_times=chapter_times,
+                                              max_ts_duration=args.max_ts_duration,
+                                              max_ts_distance=args.max_ts_distance)
+
+        calculate_shifts(src_stream, dst_stream, search_groups,
                          window=args.window,
                          max_window=args.max_window,
-                         rewind_thresh=args.rewind_thresh if args.grouping else 0,
-                         max_ts_duration=args.max_ts_duration,
-                         max_ts_distance=args.max_ts_distance)
+                         rewind_thresh=args.rewind_thresh if args.grouping else 0)
 
         events = script.events
 

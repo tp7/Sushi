@@ -173,9 +173,9 @@ class WavStream(object):
         # this function gets REAL sample for time, taking padding into account
         return int(self.sample_rate * timestamp) + self.padding_size
 
-    def find_substream(self, pattern, start_time, end_time):
-        start_time = clip(start_time, -self.PADDING_SECONDS, self.duration_seconds)
-        end_time = clip(end_time, 0, self.duration_seconds + self.PADDING_SECONDS)
+    def find_substream(self, pattern, window_center, window_size):
+        start_time = clip(window_center - window_size, -self.PADDING_SECONDS, self.duration_seconds)
+        end_time = clip(window_center + window_size, 0, self.duration_seconds + self.PADDING_SECONDS)
 
         start_sample = self._get_sample_for_time(start_time)
         end_sample = self._get_sample_for_time(end_time) + len(pattern[0])
