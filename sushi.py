@@ -27,6 +27,25 @@ ALLOWED_ERROR = 0.01
 MAX_GROUP_STD = 0.025
 
 
+class ColoredLogFormatter(logging.Formatter):
+    bold_code = "\033[1m"
+    reset_code = "\033[0m"
+
+    error_format = "{bold}ERROR: %(message)s{reset}".format(bold=bold_code, reset=reset_code)
+    warn_format = "{bold}WARNING: %(message)s{reset}".format(bold=bold_code, reset=reset_code)
+    default_format = "%(message)s"
+
+    def format(self, record):
+        if record.levelno == logging.WARN:
+            self._fmt = self.warn_format
+        elif record.levelno == logging.ERROR or record.levelno == logging.CRITICAL:
+            self._fmt =  self.error_format
+        else:
+            self._fmt = self.default_format
+
+        return super(ColoredLogFormatter, self).format(record)
+
+
 def abs_diff(a, b):
     return abs(a - b)
 
@@ -803,7 +822,15 @@ def parse_args_and_run(cmd_keys):
 
 if __name__ == '__main__':
     try:
-        logging.basicConfig(level=logging.DEBUG, format="%(message)s")
+        handler = logging.StreamHandler()
+        if os.isatty(sys.stderr.fileno()):
+            # enable colors
+            handler.setFormatter(ColoredLogFormatter())
+        else:
+            handler.setFormatter(logging.Formatter(fmt=ColoredLogFormatter.default_format))
+        logging.root.addHandler(handler)
+        logging.root.setLevel(logging.DEBUG)
+
         parse_args_and_run(sys.argv[1:])
     except SushiError as e:
         logging.critical(e.message)
