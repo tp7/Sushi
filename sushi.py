@@ -2,14 +2,16 @@
 import logging
 import sys
 import operator
-from itertools import takewhile, izip
-import numpy as np
 import argparse
-import chapters
 import os
-from time import time
 import bisect
+import collections
+from itertools import takewhile, izip, chain
+from time import time
 
+import numpy as np
+
+import chapters
 from common import SushiError, get_extension, format_time, ensure_static_collection
 from demux import Timecodes, Demuxer
 from keyframes import parse_keyframes
@@ -444,60 +446,105 @@ def prepare_search_groups(events, source_duration, chapter_times, max_ts_duratio
     return passed_groups
 
 
-def calculate_shifts(src_stream, dst_stream, groups_list, window, max_window, rewind_thresh):
+def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_window, rewind_thresh):
+    def log_shift(state):
+        logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
+                      .format(format_time(state["start_time"]), format_time(state["end_time"]), state["shift"], state["diff"]))
+
     small_window = 1.5
-    last_shift = 0
-    consecutive_changes = 0
     idx = 0
+    committed_states = []
+    uncommitted_states = []
+    window = normal_window
     while idx < len(groups_list):
         search_group = groups_list[idx]
         tv_audio = src_stream.get_substream(search_group[0].start, search_group[-1].end)
-
         original_time = search_group[0].start
-        start_point = original_time + last_shift
+        group_state = {"start_time": search_group[0].start, "end_time": search_group[-1].end, "shift": None, "diff": None}
+        last_committed_shift = committed_states[-1]["shift"] if committed_states else 0
+        diff = new_time = None
 
-        # make sure we don't crash because lines aren't present in the destination stream
-        if start_point > dst_stream.duration_seconds:
-            logging.info('Search start point is larger than dst stream duration, ignoring: %s' % unicode(search_group[0]))
+        if not uncommitted_states:
+            if original_time + last_committed_shift > dst_stream.duration_seconds:
+                # event outside of audio range
+                group_state.update({"shift": None, "diff": None})
+                committed_states.append(group_state)
+                idx += 1
+                continue
+
+            if small_window < window:
+                diff, new_time = dst_stream.find_substream(tv_audio, original_time + last_committed_shift, small_window)
+
+            if new_time is not None and abs_diff(new_time - original_time, last_committed_shift) <= ALLOWED_ERROR:
+                # fastest case - small window worked, commit the group immediately
+                group_state.update({"shift": new_time - original_time, "diff": diff})
+                committed_states.append(group_state)
+                log_shift(group_state)
+                if window != normal_window:
+                    logging.debug("Going back to window {0} from {1}".format(normal_window, window))
+                    window = normal_window
+                idx += 1
+                continue
+
+        left_audio_half, right_audio_half = np.split(tv_audio, [len(tv_audio[0])/2], axis=1)
+        right_half_offset = len(left_audio_half[0]) / float(src_stream.sample_rate)
+        terminate = False
+        # searching from last committed shift
+        if original_time + last_committed_shift < dst_stream.duration_seconds:
+            diff, new_time = dst_stream.find_substream(tv_audio, original_time + last_committed_shift, window)
+            left_side_time = dst_stream.find_substream(left_audio_half, original_time + last_committed_shift, window)[1]
+            right_side_time = dst_stream.find_substream(right_audio_half, original_time + last_committed_shift + right_half_offset, window)[1] - right_half_offset
+            terminate = abs_diff(left_side_time, right_side_time) <= ALLOWED_ERROR and abs_diff(new_time, left_side_time) <= ALLOWED_ERROR
+
+        if not terminate and uncommitted_states and uncommitted_states[-1]["shift"] is not None \
+                and original_time + uncommitted_states[-1]["shift"] < dst_stream.duration_seconds:
+            diff, new_time = dst_stream.find_substream(tv_audio, original_time + last_committed_shift, window)
+            left_side_time = dst_stream.find_substream(left_audio_half, original_time + last_committed_shift, window)[1]
+            right_side_time = dst_stream.find_substream(right_audio_half, original_time + last_committed_shift + right_half_offset, window)[1] - right_half_offset
+            terminate = abs_diff(left_side_time, right_side_time) <= ALLOWED_ERROR and abs_diff(new_time, left_side_time) <= ALLOWED_ERROR
+
+        shift = new_time - original_time
+        if not terminate:
+            # we aren't back on track yet - add this group to uncommitted
+            group_state.update({"shift": shift, "diff": diff})
+            uncommitted_states.append(group_state)
+            idx += 1
+            if rewind_thresh == len(uncommitted_states) and window < max_window:
+                logging.warn("Detected possibly broken segment starting at {0}, increasing the window from {1} to {2}"
+                             .format(format_time(uncommitted_states[0]["start_time"]), window, max_window))
+                window = max_window
+                idx = len(committed_states)
+                del uncommitted_states[:]
+            continue
+
+        # we're back on track - apply current shift to all broken events
+        if uncommitted_states:
+            logging.warning("Events from {0} to {1} will most likely be broken!".format(
+                format_time(uncommitted_states[0]["start_time"]),
+                format_time(uncommitted_states[-1]["end_time"])))
+
+        uncommitted_states.append(group_state)
+        for state in uncommitted_states:
+            state.update({"shift": shift, "diff": diff})
+            log_shift(state)
+        committed_states.extend(uncommitted_states)
+        del uncommitted_states[:]
+        idx += 1
+
+    for state in uncommitted_states:
+        log_shift(state)
+
+    for idx, (search_group, group_state) in enumerate(izip(groups_list, chain(committed_states, uncommitted_states))):
+        if group_state["shift"] is None:
             for group in reversed(groups_list[:idx]):
                 link_to = next((x for x in reversed(group) if not x.linked), None)
                 if link_to:
                     for e in search_group:
                         e.link_event(link_to)
                     break
-            idx += 1
-            continue
-
-        # searching with smaller window
-        diff = new_time = None
-        if small_window < window:
-            diff, new_time = dst_stream.find_substream(tv_audio, start_point, small_window)
-
-        # checking if times are close enough to last shift - no point in re-searching with full window if it's in the same group
-        if new_time is None or abs_diff(new_time - original_time, last_shift) > ALLOWED_ERROR:
-            diff, new_time = dst_stream.find_substream(tv_audio, start_point, window)
-            consecutive_changes += 1
         else:
-            consecutive_changes = 0
-
-        last_shift = new_time - original_time
-
-        for e in search_group:
-            e.set_shift(last_shift, diff)
-        logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
-                      .format(format_time(search_group[0].start), format_time(search_group[-1].end), last_shift, diff))
-
-        if rewind_thresh > 0 and consecutive_changes > rewind_thresh and window < max_window:
-            window = max_window
-            idx -= rewind_thresh
-            last_shift = groups_list[idx][-1].shift
-            consecutive_changes = 0
-            logging.warn("Detected possibly broken segment starting at {0}, rewinding to shift {1} "
-                         "and trying larger window ({2})"
-                         .format(format_time(groups_list[idx][0].start), round(last_shift, 4), window))
-            continue
-
-        idx += 1
+            for e in search_group:
+                e.set_shift(group_state["shift"], group_state["diff"])
 
 
 def check_file_exists(path, file_title):
@@ -662,7 +709,7 @@ def run(args):
                                               max_ts_distance=args.max_ts_distance)
 
         calculate_shifts(src_stream, dst_stream, search_groups,
-                         window=args.window,
+                         normal_window=args.window,
                          max_window=args.max_window,
                          rewind_thresh=args.rewind_thresh if args.grouping else 0)
 
