@@ -22,8 +22,19 @@ from wav import WavStream
 try:
     import matplotlib.pyplot as plt
     plot_enabled = True
-except:
+except ImportError:
     plot_enabled = False
+
+if sys.platform == 'win32':
+    try:
+        import colorama
+        colorama.init()
+        console_colors_supported = True
+    except ImportError:
+        console_colors_supported = False
+else:
+    console_colors_supported = True
+
 
 ALLOWED_ERROR = 0.01
 MAX_GROUP_STD = 0.025
@@ -870,7 +881,7 @@ def parse_args_and_run(cmd_keys):
 if __name__ == '__main__':
     try:
         handler = logging.StreamHandler()
-        if os.isatty(sys.stderr.fileno()):
+        if console_colors_supported and os.isatty(sys.stderr.fileno()):
             # enable colors
             handler.setFormatter(ColoredLogFormatter())
         else:
