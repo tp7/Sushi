@@ -29,11 +29,15 @@ Sushi should work on Windows, Linux and OS X. Please open an issue if it doesn't
 1. [Python 2.7.x][5]
 2. [NumPy][6] (1.8 or newer)
 3. [OpenCV 2.4.x or newer][7] (on Windows putting [this file][8] in the same folder as Sushi should be enough, assuming you use x86 Python)
-4. [FFmpeg][9] (only if demuxing is used)
-5. [MkvExtract][10] (optional for faster timecodes extraction when demuxing)
-6. [SCXvid-standalone][11] (only if keyframes are made by Sushi)
 
-The provided Windows binaries include Python, NumPy and OpenCV so you don't have to install them if you use the binary distribution. You still have to download other applications yourself if you want to use Sushi's demuxing capabilities.
+Optionally, you might want:
+
+1. [FFmpeg][9] for any kind of demuxing
+2. [MkvExtract][10] for faster timecodes extraction when demuxing
+3. [SCXvid-standalone][11] if you want Sushi to make keyframes
+4. [Colorama](https://github.com/tartley/colorama) to add colors to console output on Windows
+
+The provided Windows binaries include all required components and Colorama so you don't have to install them if you use the binary distribution. You still have to download other applications yourself if you want to use Sushi's demuxing capabilities.
 
 #### Installation on Mac OS X
 
