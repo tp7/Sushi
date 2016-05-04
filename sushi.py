@@ -43,13 +43,17 @@ MAX_GROUP_STD = 0.025
 class ColoredLogFormatter(logging.Formatter):
     bold_code = "\033[1m"
     reset_code = "\033[0m"
+    grey_code = "\033[30m\033[1m"
 
     error_format = "{bold}ERROR: %(message)s{reset}".format(bold=bold_code, reset=reset_code)
     warn_format = "{bold}WARNING: %(message)s{reset}".format(bold=bold_code, reset=reset_code)
+    debug_format = "{grey}%(message)s{reset}".format(grey=grey_code, reset=reset_code)
     default_format = "%(message)s"
 
     def format(self, record):
-        if record.levelno == logging.WARN:
+        if record.levelno == logging.DEBUG:
+            self._fmt = self.debug_format
+        elif record.levelno == logging.WARN:
             self._fmt = self.warn_format
         elif record.levelno == logging.ERROR or record.levelno == logging.CRITICAL:
             self._fmt =  self.error_format
@@ -185,7 +189,7 @@ def detect_groups(events, min_group_size):
 
 
 def groups_from_chapters(events, times):
-    logging.debug(u'Chapter start points: {0}'.format([format_time(t) for t in times]))
+    logging.info(u'Chapter start points: {0}'.format([format_time(t) for t in times]))
     groups = [[]]
     chapter_times = iter(times[1:] + [36000000000])  # very large event at the end
     current_chapter = next(chapter_times)
@@ -268,11 +272,11 @@ def fix_near_borders(events):
 
     fixed_count = fix_border(events, median_diff)
     if fixed_count:
-        logging.debug('Fixing {0} border events right after {1}'.format(fixed_count, format_time(events[0].start)))
+        logging.info('Fixing {0} border events right after {1}'.format(fixed_count, format_time(events[0].start)))
 
     fixed_count = fix_border(list(reversed(events)), median_diff)
     if fixed_count:
-        logging.debug('Fixing {0} border events right before {1}'.format(fixed_count, format_time(events[-1].end)))
+        logging.info('Fixing {0} border events right before {1}'.format(fixed_count, format_time(events[-1].end)))
 
 
 def get_distance_to_closest_kf(timestamp, keyframes):
@@ -343,7 +347,7 @@ def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_dist
             mean_shift = np.mean(shifts)
             shifts = zip(*(iter(shifts), ) * 2)
 
-            logging.debug('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), mean_shift))
+            logging.info('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), mean_shift))
             for group, (start_shift, end_shift) in izip(groups, shifts):
                 if abs(start_shift-end_shift) > 0.001 and len(group) > 1:
                     actual_shift = min(start_shift, end_shift, key=lambda x: abs(x - mean_shift))
@@ -362,7 +366,7 @@ def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_dist
                 pass  # we don't snap typesetting
             start_shift, end_shift = find_keyframes_distances(group[0], src_keytimes, dst_keytimes, src_timecodes, max_kf_distance)
             if abs(start_shift) > 0.01 or abs(end_shift) > 0.01:
-                logging.debug('Snapping {0} to keyframes, start time by {1}, end: {2}'.format(format_time(group[0].start), start_shift, end_shift))
+                logging.info('Snapping {0} to keyframes, start time by {1}, end: {2}'.format(format_time(group[0].start), start_shift, end_shift))
                 group[0].adjust_additional_shifts(start_shift, end_shift)
 
 
@@ -423,7 +427,7 @@ def prepare_search_groups(events, source_duration, chapter_times, max_ts_duratio
             event.link_event(last_unlinked)
             continue
         elif event.end == event.start:
-            logging.debug('{0}: skipped because zero duration'.format(format_time(event.start)))
+            logging.info('{0}: skipped because zero duration'.format(format_time(event.start)))
             try:
                 event.link_event(events[idx + 1])
             except IndexError:
@@ -459,8 +463,14 @@ def prepare_search_groups(events, source_duration, chapter_times, max_ts_duratio
 
 def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_window, rewind_thresh):
     def log_shift(state):
-        logging.debug('{0}-{1}: shift: {2:0.12f}, diff: {3:0.12f}'
+        logging.info('{0}-{1}: shift: {2:0.10f}, diff: {3:0.10f}'
                       .format(format_time(state["start_time"]), format_time(state["end_time"]), state["shift"], state["diff"]))
+
+    def log_uncommitted(state, shift, left_side_shift, right_side_shift, search_offset):
+        logging.debug('{0}-{1}: shift: {2:0.5f} [{3:0.5f}, {4:0.5f}], search offset: {5:0.6f}'
+                      .format(format_time(state["start_time"]), format_time(state["end_time"]),
+                              shift, left_side_shift, right_side_shift, search_offset))
+
 
     small_window = 1.5
     idx = 0
@@ -477,11 +487,11 @@ def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_win
 
         if not uncommitted_states:
             if original_time + last_committed_shift > dst_stream.duration_seconds:
-                # event outside of audio range
-                group_state.update({"shift": None, "diff": None})
-                committed_states.append(group_state)
-                idx += 1
-                continue
+                # event outside of audio range, all events past it are also guaranteed to fail
+                for g in groups_list[idx:]:
+                    committed_states.append({"start_time": g[0].start, "end_time": g[-1].end, "shift": None, "diff": None})
+                    logging.info("{0}-{1}: outside of audio range".format(format_time(g[0].start), format_time(g[-1].end)))
+                break
 
             if small_window < window:
                 diff, new_time = dst_stream.find_substream(tv_audio, original_time + last_committed_shift, small_window)
@@ -492,7 +502,7 @@ def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_win
                 committed_states.append(group_state)
                 log_shift(group_state)
                 if window != normal_window:
-                    logging.debug("Going back to window {0} from {1}".format(normal_window, window))
+                    logging.info("Going back to window {0} from {1}".format(normal_window, window))
                     window = normal_window
                 idx += 1
                 continue
@@ -506,13 +516,18 @@ def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_win
             left_side_time = dst_stream.find_substream(left_audio_half, original_time + last_committed_shift, window)[1]
             right_side_time = dst_stream.find_substream(right_audio_half, original_time + last_committed_shift + right_half_offset, window)[1] - right_half_offset
             terminate = abs_diff(left_side_time, right_side_time) <= ALLOWED_ERROR and abs_diff(new_time, left_side_time) <= ALLOWED_ERROR
+            log_uncommitted(group_state, new_time - original_time, left_side_time - original_time,
+                            right_side_time - original_time, last_committed_shift)
 
         if not terminate and uncommitted_states and uncommitted_states[-1]["shift"] is not None \
                 and original_time + uncommitted_states[-1]["shift"] < dst_stream.duration_seconds:
-            diff, new_time = dst_stream.find_substream(tv_audio, original_time + last_committed_shift, window)
-            left_side_time = dst_stream.find_substream(left_audio_half, original_time + last_committed_shift, window)[1]
-            right_side_time = dst_stream.find_substream(right_audio_half, original_time + last_committed_shift + right_half_offset, window)[1] - right_half_offset
+            start_offset =  uncommitted_states[-1]["shift"]
+            diff, new_time = dst_stream.find_substream(tv_audio, original_time + start_offset, window)
+            left_side_time = dst_stream.find_substream(left_audio_half, original_time + start_offset, window)[1]
+            right_side_time = dst_stream.find_substream(right_audio_half, original_time + start_offset + right_half_offset, window)[1] - right_half_offset
             terminate = abs_diff(left_side_time, right_side_time) <= ALLOWED_ERROR and abs_diff(new_time, left_side_time) <= ALLOWED_ERROR
+            log_uncommitted(group_state, new_time - original_time, left_side_time - original_time,
+                            right_side_time - original_time, start_offset)
 
         shift = new_time - original_time
         if not terminate:
@@ -864,6 +879,9 @@ def create_arg_parser():
     parser.add_argument('-o', '--output', default=None, dest='output_script', metavar='<filename>',
                         help='Output script')
 
+    parser.add_argument('-v', '--vebose', default=False, dest='verbose', action='store_true',
+                        help='Enable verbose logging')
+
     return parser
 
 
@@ -872,7 +890,16 @@ def parse_args_and_run(cmd_keys):
         return arg if ' ' not in arg else '"{0}"'.format(arg)
 
     args = create_arg_parser().parse_args(cmd_keys)
-    logging.debug("Sushi's running with arguments: {0}".format(' '.join(map(format_arg, cmd_keys))))
+    handler = logging.StreamHandler()
+    if console_colors_supported and os.isatty(sys.stderr.fileno()):
+        # enable colors
+        handler.setFormatter(ColoredLogFormatter())
+    else:
+        handler.setFormatter(logging.Formatter(fmt=ColoredLogFormatter.default_format))
+    logging.root.addHandler(handler)
+    logging.root.setLevel(logging.DEBUG if args.verbose else logging.INFO)
+
+    logging.info("Sushi's running with arguments: {0}".format(' '.join(map(format_arg, cmd_keys))))
     start_time = time()
     run(args)
     logging.info('Done in {0}s'.format(time() - start_time))
@@ -880,15 +907,6 @@ def parse_args_and_run(cmd_keys):
 
 if __name__ == '__main__':
     try:
-        handler = logging.StreamHandler()
-        if console_colors_supported and os.isatty(sys.stderr.fileno()):
-            # enable colors
-            handler.setFormatter(ColoredLogFormatter())
-        else:
-            handler.setFormatter(logging.Formatter(fmt=ColoredLogFormatter.default_format))
-        logging.root.addHandler(handler)
-        logging.root.setLevel(logging.DEBUG)
-
         parse_args_and_run(sys.argv[1:])
     except SushiError as e:
         logging.critical(e.message)

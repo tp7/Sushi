@@ -49,7 +49,7 @@ class FFmpeg(object):
         if timecodes_path is not None:
             args.extend(('-map', '0:{0}'.format(video_stream), '-f', 'mkvtimestamp_v2', timecodes_path))
 
-        logging.debug('ffmpeg args: {0}'.format(' '.join(('"{0}"' if ' ' in a else '{0}').format(a) for a in args)))
+        logging.info('ffmpeg args: {0}'.format(' '.join(('"{0}"' if ' ' in a else '{0}').format(a) for a in args)))
         try:
             subprocess.call(args)
         except OSError as e:

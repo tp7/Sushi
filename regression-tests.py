@@ -5,22 +5,19 @@ import os
 import gc
 import sys
 import resource
-from common import format_time, SushiError
+from common import format_time
 from demux import Timecodes
 from subs import AssScript
 from wav import WavStream
 import re
-from sushi import parse_args_and_run
+import subprocess
 
 
-console_handler = None
 root_logger = logging.getLogger('')
-
-tags_stripper = re.compile(r'{.*?}')
 
 
 def strip_tags(text):
-    return tags_stripper.sub(" ", text)
+    return re.sub(r'{.*?}', " ", text)
 
 
 def count_overlaps(events):
@@ -29,7 +26,7 @@ def count_overlaps(events):
 
 @contextmanager
 def set_file_logger(path):
-    handler = logging.FileHandler(path, mode='w')
+    handler = logging.FileHandler(path, mode='a')
     handler.setLevel(logging.DEBUG)
     handler.setFormatter(logging.Formatter('%(message)s'))
     root_logger.addHandler(handler)
@@ -37,15 +34,6 @@ def set_file_logger(path):
         yield
     finally:
         root_logger.removeHandler(handler)
-
-
-@contextmanager
-def remove_console_logger():
-    root_logger.removeHandler(console_handler)
-    try:
-        yield
-    finally:
-        root_logger.addHandler(console_handler)
 
 
 def compare_scripts(ideal_path, test_path, timecodes, test_name, expected_errors):
@@ -105,7 +93,7 @@ def run_test(base_path, plots_path, test_name, params):
 
     folder = os.path.join(base_path, params['folder'])
 
-    cmd = []
+    cmd = ["sushi"]
 
     safe_add_path(cmd, folder, '--src', 'src')
     safe_add_path(cmd, folder, '--dst', 'dst')
@@ -126,14 +114,16 @@ def run_test(base_path, plots_path, test_name, params):
     if plots_path:
         cmd.extend(('--test-shift-plot', os.path.join(plots_path, '{0}.png'.format(test_name))))
 
-    with set_file_logger(os.path.join(folder, 'sushi_test.log')):
+    log_path = os.path.join(folder, 'sushi_test.log')
+
+    with open(log_path, "w") as log_file:
         try:
-            with remove_console_logger():
-                parse_args_and_run(cmd)
+            subprocess.call(cmd, stderr=log_file, stdout=log_file)
         except Exception as e:
             logging.critical('Sushi failed on test "{0}": {1}'.format(test_name, e.message))
             return False
 
+    with set_file_logger(log_path):
         ideal_path = os.path.join(folder, params['ideal'])
         try:
             timecodes = Timecodes.from_file(os.path.join(folder, params['dst-timecodes']))
@@ -164,7 +154,6 @@ def run_wav_test(test_name, file_path, params):
 
 def run():
     root_logger.setLevel(logging.DEBUG)
-    global console_handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(logging.Formatter('%(message)s'))

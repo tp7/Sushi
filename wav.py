@@ -115,7 +115,7 @@ class WavStream(object):
         self.sample_count = math.ceil(total_seconds * sample_rate)
         self.sample_rate = sample_rate
         # pre-allocating the data array and some place for padding
-        self.data = np.empty((1, self.PADDING_SECONDS * 2 * stream.framerate + self.sample_count), np.float32)
+        self.data = np.empty((1, int(self.PADDING_SECONDS * 2 * stream.framerate + self.sample_count)), np.float32)
         self.padding_size = 10 * stream.framerate
         before_read = time()
         try:
