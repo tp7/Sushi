@@ -116,45 +116,14 @@ def smooth_events(events, radius):
         event.set_shift(new_shift, event.diff)
 
 
-def detect_groups(events, min_group_size):
-    last_shift = events[0].shift
-    current_group = []
-    groups = []
-    for e in events:
-        if abs_diff(e.shift, last_shift) > ALLOWED_ERROR:
-            groups.append(current_group)
-            current_group = [e]
-            last_shift = e.shift
-        else:
-            current_group.append(e)
-    groups.append(current_group)
-
-    if not any(g for g in groups if len(g) >= min_group_size):
-        return groups  # not a single large group to merge into
-
-    large = []
-    groups = iter(groups)
-    a = next(groups, None)
-    while a is not None:
-        if len(a) >= min_group_size:
-            large.append(a)
-            a = next(groups, None)
-        else:
-            small = []
-            while a and len(a) < min_group_size:
-                small.extend(a)
-                a = next(groups, None)
-
-            if not large:
-                a = small + a  # no large groups before, extend the next one
-            elif not a:
-                large[-1].extend(small)  # next group doesn't exist, extend the previous one
-            elif abs_diff(a[0].shift, small[-1].shift) < abs_diff(large[-1][-1].shift, small[0].shift):
-                a = small + a  # next group has closer diff then the next one
-            else:
-                large[-1].extend(small)
-
-    return large
+def detect_groups(events_iter):
+    events_iter = iter(events_iter)
+    groups_list = [[next(events_iter)]]
+    for event in events_iter:
+        if abs_diff(event.shift, groups_list[-1][-1].shift) > ALLOWED_ERROR:
+            groups_list.append([])
+        groups_list[-1].append(event)
+    return groups_list
 
 
 def groups_from_chapters(events, times):
@@ -191,7 +160,7 @@ def groups_from_chapters(events, times):
     return groups
 
 
-def split_broken_groups(groups, min_auto_group_size):
+def split_broken_groups(groups):
     correct_groups = []
     broken_found = False
     for g in groups:
@@ -200,7 +169,7 @@ def split_broken_groups(groups, min_auto_group_size):
             logging.warn(u'Shift is not consistent between {0} and {1}, most likely chapters are wrong (std: {2}). '
                          u'Switching to automatic grouping.'.format(format_time(g[0].start), format_time(g[-1].end),
                                                                     std))
-            correct_groups.extend(detect_groups(g, min_auto_group_size))
+            correct_groups.extend(detect_groups(g))
             broken_found = True
         else:
             correct_groups.append(g)
@@ -719,11 +688,11 @@ def run(args):
                 for g in groups:
                     fix_near_borders(g)
                     smooth_events([x for x in g if not x.linked], args.smooth_radius)
-                groups = split_broken_groups(groups, args.min_group_size)
+                groups = split_broken_groups(groups)
             else:
                 fix_near_borders(events)
                 smooth_events([x for x in events if not x.linked], args.smooth_radius)
-                groups = detect_groups(events, args.min_group_size)
+                groups = detect_groups(events)
 
             if write_plot:
                 plt.plot([x.shift for x in events], label='Borders fixed')
@@ -799,8 +768,6 @@ def create_arg_parser():
                         help='Maximum distance between two adjacent typesetting lines to be merged. [%(default).3f]')
 
     # deprecated/test options, do not use
-    parser.add_argument('--min-group-size', default=1, type=int, metavar='<events>', dest='min_group_size',
-                        help=argparse.SUPPRESS)
     parser.add_argument('--test-shift-plot', default=None, dest='plot_path', help=argparse.SUPPRESS)
     parser.add_argument('--sample-type', default='uint8', choices=['float32', 'uint8'], dest='sample_type',
                         help=argparse.SUPPRESS)
