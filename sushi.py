@@ -7,14 +7,14 @@ import os
 import bisect
 import collections
 from itertools import takewhile, izip, chain
-from time import time
+import time
 
 import numpy as np
 
 import chapters
 from common import SushiError, get_extension, format_time, ensure_static_collection
 from demux import Timecodes, Demuxer
-from keyframes import parse_keyframes
+import keyframes
 from subs import AssScript, SrtScript
 from wav import WavStream
 
@@ -175,17 +175,14 @@ def split_broken_groups(groups):
             correct_groups.append(g)
 
     if broken_found:
-        correct_groups.sort(key=lambda g: g[0].start)
+        groups_iter = iter(correct_groups)
+        correct_groups = [list(next(groups_iter))]
+        for group in groups_iter:
+            if abs_diff(correct_groups[-1][-1].shift, group[0].shift) >= ALLOWED_ERROR \
+                    or np.std([e.shift for e in group + correct_groups[-1]]) >= MAX_GROUP_STD:
+                correct_groups.append([])
 
-        i = 0
-        while i < len(correct_groups) - 1:
-            if abs_diff(correct_groups[i][-1].shift, correct_groups[i + 1][0].shift) < ALLOWED_ERROR \
-                    and np.std([e.shift for e in correct_groups[i] + correct_groups[i + 1]]) < MAX_GROUP_STD:
-                correct_groups[i].extend(correct_groups[i + 1])
-                del correct_groups[i + 1]
-            else:
-                i += 1
-
+            correct_groups[-1].extend(group)
     return correct_groups
 
 
@@ -408,7 +405,6 @@ def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_win
         logging.debug('{0}-{1}: shift: {2:0.5f} [{3:0.5f}, {4:0.5f}], search offset: {5:0.6f}'
                       .format(format_time(state["start_time"]), format_time(state["end_time"]),
                               shift, left_side_shift, right_side_shift, search_offset))
-
 
     small_window = 1.5
     idx = 0
@@ -655,10 +651,10 @@ def run(args):
     try:
         if args.src_keyframes:
             src_timecodes = Timecodes.cfr(args.src_fps) if args.src_fps else Timecodes.from_file(src_timecodes_file)
-            src_keytimes = [src_timecodes.get_frame_time(f) for f in parse_keyframes(src_keyframes_file)]
+            src_keytimes = [src_timecodes.get_frame_time(f) for f in keyframes.parse_keyframes(src_keyframes_file)]
 
             dst_timecodes = Timecodes.cfr(args.dst_fps) if args.dst_fps else Timecodes.from_file(dst_timecodes_file)
-            dst_keytimes = [dst_timecodes.get_frame_time(f) for f in parse_keyframes(dst_keyframes_file)]
+            dst_keytimes = [dst_timecodes.get_frame_time(f) for f in keyframes.parse_keyframes(dst_keyframes_file)]
 
         script = AssScript.from_file(src_script_path) if script_extension == '.ass' else SrtScript.from_file(src_script_path)
         script.sort_by_time()
@@ -832,9 +828,9 @@ def parse_args_and_run(cmd_keys):
     logging.root.setLevel(logging.DEBUG if args.verbose else logging.INFO)
 
     logging.info("Sushi's running with arguments: {0}".format(' '.join(map(format_arg, cmd_keys))))
-    start_time = time()
+    start_time = time.time()
     run(args)
-    logging.info('Done in {0}s'.format(time() - start_time))
+    logging.info('Done in {0}s'.format(time.time() - start_time))
 
 
 if __name__ == '__main__':

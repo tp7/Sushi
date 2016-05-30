@@ -1,26 +1,28 @@
 import codecs
 import os
 import re
-from collections import OrderedDict
+import collections
+
 from common import SushiError, format_time, format_srt_time
 
 
 def _parse_ass_time(string):
     hours, minutes, seconds = map(float, string.split(':'))
-    return hours*3600+minutes*60+seconds
+    return hours * 3600 + minutes * 60 + seconds
 
 
 class ScriptEventBase(object):
-    def __init__(self, start, end):
-        super(ScriptEventBase, self).__init__()
-        self._shift = 0
-        self._diff = 1
+    def __init__(self, source_index, start, end, text):
+        self.source_index = source_index
         self.start = start
         self.end = end
+        self.text = text
+
+        self._shift = 0
+        self._diff = 1
         self._linked_event = None
         self._start_shift = 0
         self._end_shift = 0
-        self.source_index = 0
 
     @property
     def shift(self):
@@ -47,14 +49,12 @@ class ScriptEventBase(object):
         self.end = self.shifted_end
 
     def set_shift(self, shift, audio_diff):
-        if self.linked:
-            raise Exception('Cannot set shift of a linked event. This is a bug')
+        assert not self.linked, 'Cannot set shift of a linked event'
         self._shift = shift
         self._diff = audio_diff
 
     def adjust_additional_shifts(self, start_shift, end_shift):
-        if self.linked:
-            raise Exception('Cannot apply additional shifts to a linked event. This is a bug')
+        assert not self.linked, 'Cannot apply additional shifts to a linked event'
         self._start_shift += start_shift
         self._end_shift += end_shift
 
@@ -62,13 +62,11 @@ class ScriptEventBase(object):
         return self._linked_event.get_link_chain_end() if self.linked else self
 
     def link_event(self, other):
-        if other.get_link_chain_end() is self:
-            raise Exception('Circular link detected. This is a bug')
+        assert other.get_link_chain_end() is not self, 'Circular link detected'
         self._linked_event = other
 
     def resolve_link(self):
-        if not self.linked:
-            raise Exception('Cannot resolve unlinked events. This is a bug')
+        assert self.linked, 'Cannot resolve unlinked events'
         self._shift = self._linked_event.shift
         self._diff = self._linked_event.diff
         self._linked_event = None
@@ -78,8 +76,7 @@ class ScriptEventBase(object):
         return self._linked_event is not None
 
     def adjust_shift(self, value):
-        if self.linked:
-            raise Exception('Cannot adjust time of linked events. This is a bug')
+        assert not self.linked, 'Cannot adjust time of linked events'
         self._shift += value
 
     def __repr__(self):
@@ -87,16 +84,17 @@ class ScriptEventBase(object):
 
 
 class ScriptBase(object):
+    def __init__(self, events):
+        self.events = events
+
     def sort_by_time(self):
         self.events.sort(key=lambda x: x.start)
 
-    def remember_ordering(self):
-        for idx, event in enumerate(self.events):
-            # 1-based for srt, ass doesn't use them for anything but sorting anyway
-            event.source_index = idx + 1
-
 
 class SrtEvent(ScriptEventBase):
+    is_comment = False
+    style = None
+
     EVENT_REGEX = re.compile("""
                                (\d+?). # line-number
                                (\d{1,2}:\d{1,2}:\d{1,2},\d+)\s-->\s(\d{1,2}:\d{1,2}:\d{1,2},\d+).  # timestamp
@@ -106,13 +104,6 @@ class SrtEvent(ScriptEventBase):
                                \d{1,2}:\d{1,2}:\d{1,2},\d+\s-->\s\d{1,2}:\d{1,2}:\d{1,2},\d+) # timestamp
                                |$
                            )""", flags=re.VERBOSE | re.DOTALL)
-
-    def __init__(self, idx, start, end, text):
-        super(SrtEvent, self).__init__(start, end)
-        self.source_index = idx
-        self.text = text
-        self.style = None
-        self.is_comment = False
 
     @classmethod
     def from_string(cls, text):
@@ -135,24 +126,17 @@ class SrtEvent(ScriptEventBase):
 
 
 class SrtScript(ScriptBase):
-    def __init__(self, events):
-        super(SrtScript, self).__init__()
-        self.events = events
-
     @classmethod
     def from_file(cls, path):
         try:
             with codecs.open(path, encoding='utf-8-sig') as script:
                 text = script.read()
-                events_list = []
-                for match in SrtEvent.EVENT_REGEX.finditer(text):
-                    event = SrtEvent(
-                        idx=int(match.group(1)),
-                        start=SrtEvent.parse_time(match.group(2)),
-                        end=SrtEvent.parse_time(match.group(3)),
-                        text=match.group(4).strip()
-                    )
-                    events_list.append(event)
+                events_list = [SrtEvent(
+                    source_index=int(match.group(1)),
+                    start=SrtEvent.parse_time(match.group(2)),
+                    end=SrtEvent.parse_time(match.group(3)),
+                    text=match.group(4).strip()
+                ) for match in SrtEvent.EVENT_REGEX.finditer(text)]
                 return cls(events_list)
         except IOError:
             raise SushiError("Script {0} not found".format(path))
@@ -164,18 +148,18 @@ class SrtScript(ScriptBase):
 
 
 class AssEvent(ScriptEventBase):
-    def __init__(self, text):
-        self.source_index = 0
-        split = text.split(':', 1)
-        self.kind = split[0]
+    def __init__(self, text, position=0):
+        kind, _, rest = text.partition(':')
+        split = [x.strip() for x in rest.split(',', 9)]
+
+        super(AssEvent, self).__init__(
+            source_index=position,
+            start=_parse_ass_time(split[1]),
+            end=_parse_ass_time(split[2]),
+            text=split[9]
+        )
+        self.kind = kind
         self.is_comment = self.kind.lower() == 'comment'
-        split = [x.strip() for x in split[1].split(',', 9)]
-
-        start = _parse_ass_time(split[1])
-        end = _parse_ass_time(split[2])
-
-        super(AssEvent, self).__init__(start, end)
-
         self.layer = split[0]
         self.style = split[3]
         self.name = split[4]
@@ -183,7 +167,6 @@ class AssEvent(ScriptEventBase):
         self.margin_right = split[6]
         self.margin_vertical = split[7]
         self.effect = split[8]
-        self.text = split[9]
 
     def __unicode__(self):
         return u'{0}: {1},{2},{3},{4},{5},{6},{7},{8},{9},{10}'.format(self.kind, self.layer,
@@ -201,17 +184,15 @@ class AssEvent(ScriptEventBase):
 
 class AssScript(ScriptBase):
     def __init__(self, script_info, styles, events, other):
-        super(AssScript, self).__init__()
+        super(AssScript, self).__init__(events)
         self.script_info = script_info
         self.styles = styles
-        self.events = events
         self.other = other
-        self.remember_ordering()
 
     @classmethod
     def from_file(cls, path):
         script_info, styles, events = [], [], []
-        other_sections = OrderedDict()
+        other_sections = collections.OrderedDict()
 
         def parse_script_info_line(line):
             if line.startswith(u'Format:'):
@@ -226,7 +207,7 @@ class AssScript(ScriptBase):
         def parse_event_line(line):
             if line.startswith(u'Format:'):
                 return
-            events.append(AssEvent(line))
+            events.append(AssEvent(line, position=len(events)+1))
 
         def create_generic_parse(section_name):
             if section_name in other_sections:

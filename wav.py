@@ -13,9 +13,10 @@ WAVE_FORMAT_EXTENSIBLE = 0xFFFE
 
 
 class DownmixedWavFile(object):
+    _file = None
+
     def __init__(self, path):
         super(DownmixedWavFile, self).__init__()
-        self._file = None
         self._file = open(path, 'rb')
         try:
             riff = Chunk(self._file, bigendian=False)

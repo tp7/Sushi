@@ -6,7 +6,7 @@ def parse_scxvid_keyframes(text):
 
 def parse_keyframes(path):
     text = read_all_text(path)
-    if text.find('# XviD 2pass stat file')>=0:
+    if '# XviD 2pass stat file' in text:
         frames = parse_scxvid_keyframes(text)
     else:
         raise SushiError('Unsupported keyframes type')
