@@ -1,16 +1,18 @@
 from contextlib import contextmanager
-from json import load
+import json
 import logging
 import os
 import gc
 import sys
 import resource
+import re
+import subprocess
+import argparse
+
 from common import format_time
 from demux import Timecodes
 from subs import AssScript
 from wav import WavStream
-import re
-import subprocess
 
 
 root_logger = logging.getLogger('')
@@ -18,10 +20,6 @@ root_logger = logging.getLogger('')
 
 def strip_tags(text):
     return re.sub(r'{.*?}', " ", text)
-
-
-def count_overlaps(events):
-    return sum(1 for idx in xrange(1, len(events)) if events[idx].start < events[idx-1].end)
 
 
 @contextmanager
@@ -37,37 +35,43 @@ def set_file_logger(path):
 
 
 def compare_scripts(ideal_path, test_path, timecodes, test_name, expected_errors):
-    ideal = AssScript.from_file(ideal_path)
-    test = AssScript.from_file(test_path)
-    if len(test.events) != len(ideal.events):
-        logging.critical("Script length didn't match: {0} in ideal vs {1} in test. Test {2}".format(len(ideal.events), len(test.events), test_name))
+    ideal_script = AssScript.from_file(ideal_path)
+    test_script = AssScript.from_file(test_path)
+    if len(test_script.events) != len(ideal_script.events):
+        logging.critical("Script length didn't match: {0} in ideal vs {1} in test. Test {2}".format(
+            len(ideal_script.events), len(test_script.events), test_name)
+        )
         return False
-    ideal.sort_by_time()
-    test.sort_by_time()
+    ideal_script.sort_by_time()
+    test_script.sort_by_time()
     failed = 0
     ft = format_time
-    for idx, (i, t) in enumerate(zip(ideal.events, test.events)):
-        i_start_frame = timecodes.get_frame_number(i.start)
-        i_end_frame = timecodes.get_frame_number(i.end)
+    for idx, (ideal, test) in enumerate(zip(ideal_script.events, test_script.events)):
+        ideal_start_frame = timecodes.get_frame_number(ideal.start)
+        ideal_end_frame = timecodes.get_frame_number(ideal.end)
 
-        t_start_frame = timecodes.get_frame_number(t.start)
-        t_end_frame = timecodes.get_frame_number(t.end)
+        test_start_frame = timecodes.get_frame_number(test.start)
+        test_end_frame = timecodes.get_frame_number(test.end)
 
-        if i_start_frame != t_start_frame and i_end_frame != t_end_frame:
-            logging.debug(u'{0}: start and end time failed at "{1}". {2}-{3} vs {4}-{5}'.format(idx, strip_tags(i.text), ft(i.start), ft(i.end), ft(t.start), ft(t.end)))
+        if ideal_start_frame != test_start_frame and ideal_end_frame != test_end_frame:
+            logging.debug(u'{0}: start and end time failed at "{1}". {2}-{3} vs {4}-{5}'.format(
+                idx, strip_tags(ideal.text), ft(ideal.start), ft(ideal.end), ft(test.start), ft(test.end))
+            )
             failed += 1
-        elif i_end_frame != t_end_frame:
-            logging.debug(u'{0}: end time failed at "{1}". {2} vs {3}'.format(idx, strip_tags(i.text), ft(i.end), ft(t.end)))
+        elif ideal_end_frame != test_end_frame:
+            logging.debug(
+                u'{0}: end time failed at "{1}". {2} vs {3}'.format(
+                    idx, strip_tags(ideal.text), ft(ideal.end), ft(test.end))
+            )
             failed += 1
-        elif i_start_frame != t_start_frame:
-            logging.debug(u'{0}: start time failed at "{1}". {2} vs {3}'.format(idx, strip_tags(i.text), ft(i.start), ft(t.start)))
+        elif ideal_start_frame != test_start_frame:
+            logging.debug(
+                u'{0}: start time failed at "{1}". {2} vs {3}'.format(
+                    idx, strip_tags(ideal.text), ft(ideal.start), ft(test.start))
+            )
             failed += 1
 
-    # overlaps_before = count_overlaps(ideal.events)
-    # overlaps_after = count_overlaps(test.events)
-    # logging.info('Overlaps before: {0}, after: {1}, {2} new overlaps'.format(overlaps_before, overlaps_after, overlaps_after - overlaps_before))
-    logging.info('Total lines: {0}, good: {1}, failed: {2}'.format(len(ideal.events), len(ideal.events)-failed, failed))
-
+    logging.info('Total lines: {0}, good: {1}, failed: {2}'.format(len(ideal_script.events), len(ideal_script.events)-failed, failed))
 
     if failed > expected_errors:
         logging.critical('Got more failed lines than expected ({0} actual vs {1} expected)'.format(failed, expected_errors))
@@ -135,22 +139,35 @@ def run_test(base_path, plots_path, test_name, params):
 
 def run_wav_test(test_name, file_path, params):
     gc.collect(2)
+
     before = resource.getrusage(resource.RUSAGE_SELF)
     loaded = WavStream(file_path, params.get('sample_rate', 12000), params.get('sample_type', 'uint8'))
-
     after = resource.getrusage(resource.RUSAGE_SELF)
+
     total_time = (after.ru_stime - before.ru_stime) + (after.ru_utime - before.ru_utime)
     ram_difference = (after.ru_maxrss - before.ru_maxrss) / 1024.0 / 1024.0
-    success = True
+
     if 'max_time' in params and total_time > params['max_time']:
         logging.critical('Loading "{0}" took too much time: {1} vs {2} seconds'
                          .format(test_name, total_time, params['max_time']))
-        success = False
+        return False
     if 'max_memory' in params and ram_difference > params['max_memory']:
         logging.critical('Loading "{0}" consumed too much RAM: {1} vs {2}'
                          .format(test_name, ram_difference, params['max_memory']))
-        success = False
-    return success
+        return False
+    return True
+
+
+def create_arg_parser():
+    parser = argparse.ArgumentParser(description='Sushi regression testing util')
+
+    parser.add_argument('--only', dest="run_only", nargs="*", metavar='<test names>',
+                        help='Test names to run')
+    parser.add_argument('-c', '--conf', default="tests.json", dest='conf_path', metavar='<filename>',
+                        help='Config file path')
+
+    return parser
+
 
 def run():
     root_logger.setLevel(logging.DEBUG)
@@ -158,32 +175,38 @@ def run():
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(logging.Formatter('%(message)s'))
     root_logger.addHandler(console_handler)
+
+    args = create_arg_parser().parse_args()
+
     try:
-        with open('tests.json') as file:
-            json = load(file)
+        with open(args.conf_path) as file:
+            config = json.load(file)
     except IOError as e:
         logging.critical(e)
         sys.exit(2)
 
-    run_only = json.get('run-only')
+    def should_run(name):
+        return not args.run_only or name in args.run_only
 
     failed = ran = 0
-    for test_name, params in json.get('tests', {}).iteritems():
-        if run_only and test_name not in run_only:
+    for test_name, params in config.get('tests', {}).iteritems():
+        if not should_run(test_name):
             continue
         if not params.get('disabled', False):
             ran += 1
-            if not run_test(json['basepath'], json['plots'], test_name, params):
+            if not run_test(config['basepath'], config['plots'], test_name, params):
                 failed += 1
             logging.info('')
         else:
             logging.warn('Test "{0}" disabled'.format(test_name))
 
-    for test_name, params in json.get('wavs', {}).iteritems():
-        ran += 1
-        if not run_wav_test(test_name, os.path.join(json['basepath'], params['file']), params):
-            failed += 1
-        logging.info('')
+    if should_run("wavs"):
+        for test_name, params in config.get('wavs', {}).iteritems():
+            ran += 1
+            if not run_wav_test(test_name, os.path.join(config['basepath'], params['file']), params):
+                failed += 1
+            logging.info('')
+
     logging.info('Ran {0} tests, {1} failed'.format(ran, failed))
 
 
