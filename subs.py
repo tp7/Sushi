@@ -96,11 +96,11 @@ class SrtEvent(ScriptEventBase):
     style = None
 
     EVENT_REGEX = re.compile("""
-                               (\d+?). # line-number
+                               (\d+?)\s+? # line-number
                                (\d{1,2}:\d{1,2}:\d{1,2},\d+)\s-->\s(\d{1,2}:\d{1,2}:\d{1,2},\d+).  # timestamp
                                (.+?) # actual text
                            (?= # lookahead for the next line or end of the file
-                               (?:\d+?. # line-number
+                               (?:\d+?\s+? # line-number
                                \d{1,2}:\d{1,2}:\d{1,2},\d+\s-->\s\d{1,2}:\d{1,2}:\d{1,2},\d+) # timestamp
                                |$
                            )""", flags=re.VERBOSE | re.DOTALL)
