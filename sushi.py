@@ -38,6 +38,7 @@ else:
 
 ALLOWED_ERROR = 0.01
 MAX_GROUP_STD = 0.025
+VERSION = '0.5.1'
 
 
 class ColoredLogFormatter(logging.Formatter):
@@ -809,6 +810,7 @@ def create_arg_parser():
 
     parser.add_argument('-v', '--verbose', default=False, dest='verbose', action='store_true',
                         help='Enable verbose logging')
+    parser.add_argument('--version', action='version', version=VERSION)
 
     return parser
 
