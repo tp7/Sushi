@@ -82,7 +82,7 @@ In short, while this might be safe for immediate viewing, you probably shouldn't
   [5]: https://www.python.org/downloads/
   [6]: http://www.scipy.org/scipylib/download.html
   [7]: http://opencv.org/
-  [8]: https://dl.dropboxusercontent.com/u/54253260/DoNotDelete/cv2.pyd
+  [8]: https://www.dropbox.com/s/nlylgdh4bgrjgxv/cv2.pyd?dl=0
   [9]: http://www.ffmpeg.org/download.html
   [10]: http://www.bunkus.org/videotools/mkvtoolnix/downloads.html
   [11]: https://github.com/soyokaze/SCXvid-standalone/releases
