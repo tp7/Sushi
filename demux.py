@@ -191,7 +191,7 @@ class Timecodes(object):
         if not lines:
             return []
         first = lines[0].lower().lstrip()
-        if first.startswith('# timecode format v2'):
+        if first.startswith('# timecode format v2') or first.startswith('# timestamp format v2'):
             tcs = [float(x) / 1000.0 for x in lines[1:]]
             return Timecodes(tcs, None)
         elif first.startswith('# timecode format v1'):
