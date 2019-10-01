@@ -1,23 +1,12 @@
+dist: bionic
 language: python
-matrix:
-  include:
-    - name: "Python 3.5 on Xenial"
-      dist: xenial
-      python: 3.5
-    - name: "Python 3.6 on Bionic"
-      dist: bionic
-      python: 3.6
-
-virtualenv:
-  system_site_packages: true
-
-before_install:
-  - sudo apt-get update
-  - sudo apt-get install python3-opencv
-  - sudo dpkg -L python3-opencv
-  - sudo ln /dev/null /dev/raw1394
+python:
+  - 3.5
+  - 3.6
+  - 3.7
 
 install:
+  - pip install opencv-python-headless
   - pip install -r requirements.txt
 
 script:
