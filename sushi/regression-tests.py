@@ -71,7 +71,7 @@ def compare_scripts(ideal_path, test_path, timecodes, test_name, expected_errors
             )
             failed += 1
 
-    logging.info('Total lines: {0}, good: {1}, failed: {2}'.format(len(ideal_script.events), len(ideal_script.events)-failed, failed))
+    logging.info('Total lines: {0}, good: {1}, failed: {2}'.format(len(ideal_script.events), len(ideal_script.events) - failed, failed))
 
     if failed > expected_errors:
         logging.critical('Got more failed lines than expected ({0} actual vs {1} expected)'.format(failed, expected_errors))
@@ -141,7 +141,7 @@ def run_wav_test(test_name, file_path, params):
     gc.collect(2)
 
     before = resource.getrusage(resource.RUSAGE_SELF)
-    loaded = WavStream(file_path, params.get('sample_rate', 12000), params.get('sample_type', 'uint8'))
+    _ = WavStream(file_path, params.get('sample_rate', 12000), params.get('sample_type', 'uint8'))
     after = resource.getrusage(resource.RUSAGE_SELF)
 
     total_time = (after.ru_stime - before.ru_stime) + (after.ru_utime - before.ru_utime)

@@ -23,14 +23,14 @@ ASS_COMMENT = r"Comment: 0,0:18:09.15,0:18:10.36,Default,,0,0,0,,I DON'T GET IT 
 class SrtEventTestCase(unittest.TestCase):
     def test_simple_parsing(self):
         event = SrtEvent.from_string(SINGLE_LINE_SRT_EVENT)
-        self.assertEqual(14*60+21.960, event.start)
-        self.assertEqual(14*60+22.960, event.end)
+        self.assertEqual(14 * 60 + 21.960, event.start)
+        self.assertEqual(14 * 60 + 22.960, event.end)
         self.assertEqual("HOW DID IT END UP LIKE THIS?", event.text)
 
     def test_multi_line_event_parsing(self):
         event = SrtEvent.from_string(MULTILINE_SRT_EVENT)
-        self.assertEqual(13*60+12.140, event.start)
-        self.assertEqual(13*60+14.100, event.end)
+        self.assertEqual(13 * 60 + 12.140, event.start)
+        self.assertEqual(13 * 60 + 14.100, event.end)
         self.assertEqual("APPEARANCE!\nAppearrance (teisai)!\nNo wait, you're the worst (saitei)!", event.text)
 
     def test_parsing_and_printing(self):
@@ -43,8 +43,8 @@ class AssEventTestCase(unittest.TestCase):
         event = AssEvent(ASS_EVENT)
         self.assertFalse(event.is_comment)
         self.assertEqual("Dialogue", event.kind)
-        self.assertEqual(18*60+50.98, event.start)
-        self.assertEqual(18*60+55.28, event.end)
+        self.assertEqual(18 * 60 + 50.98, event.start)
+        self.assertEqual(18 * 60 + 55.28, event.end)
         self.assertEqual("0", event.layer)
         self.assertEqual("Default", event.style)
         self.assertEqual("", event.name)
@@ -52,7 +52,7 @@ class AssEventTestCase(unittest.TestCase):
         self.assertEqual("0", event.margin_right)
         self.assertEqual("0", event.margin_vertical)
         self.assertEqual("", event.effect)
-        self.assertEqual("Are you trying to (ouch) crush it (ouch)\N like a (ouch) vise (ouch, ouch)?", event.text)
+        self.assertEqual("Are you trying to (ouch) crush it (ouch)\\N like a (ouch) vise (ouch, ouch)?", event.text)
 
     def test_comment_parsing(self):
         event = AssEvent(ASS_COMMENT)

@@ -51,7 +51,7 @@ class DownmixedWavFile(object):
                 chunk.skip()
             if not fmt_chunk_read or not data_chink_read:
                 raise SushiError('Invalid WAV file')
-        except:
+        except Exception:
             self.close()
             raise
 
@@ -88,7 +88,7 @@ class DownmixedWavFile(object):
                 logging.error("Length of audio channels didn't match. This might result in broken output")
 
             channels = (unpacked[i::self.channels_count] for i in range(self.channels_count))
-            data = reduce(lambda a, b: a[:min_length]+b[:min_length], channels)
+            data = reduce(lambda a, b: a[:min_length] + b[:min_length], channels)
             data /= float(self.channels_count)
             return data
 
@@ -128,7 +128,7 @@ class WavStream(object):
                 data = stream.readframes(int(self.READ_CHUNK_SIZE * stream.framerate))
                 new_length = int(round(len(data) * downsample_rate))
 
-                dst_view = self.data[0][samples_read:samples_read+new_length]
+                dst_view = self.data[0][samples_read:samples_read + new_length]
 
                 if downsample_rate != 1:
                     data = data.reshape((1, len(data)))
@@ -140,7 +140,7 @@ class WavStream(object):
 
             # padding the audio from both sides
             self.data[0][0:self.padding_size].fill(self.data[0][self.padding_size])
-            self.data[0][-self.padding_size:].fill(self.data[0][-self.padding_size-1])
+            self.data[0][-self.padding_size:].fill(self.data[0][-self.padding_size - 1])
 
             # normalizing
             # also clipping the stream by 3*median value from both sides of zero

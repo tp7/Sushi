@@ -113,10 +113,11 @@ class SCXviD(object):
     def make_keyframes(cls, video_path, log_path):
         try:
             ffmpeg_process = subprocess.Popen(['ffmpeg', '-i', video_path,
-                            '-f', 'yuv4mpegpipe',
-                            '-vf', 'scale=640:360',
-                            '-pix_fmt', 'yuv420p',
-                            '-vsync', 'drop', '-'], stdout=subprocess.PIPE)
+                                               '-f', 'yuv4mpegpipe',
+                                               '-vf', 'scale=640:360',
+                                               '-pix_fmt', 'yuv420p',
+                                               '-vsync', 'drop', '-'],
+                                              stdout=subprocess.PIPE)
         except OSError as e:
             if e.errno == 2:
                 raise SushiError("Couldn't invoke ffmpeg, check that it's installed")
@@ -143,7 +144,7 @@ class Timecodes(object):
             return self.times[number]
         except IndexError:
             if not self.default_frame_duration:
-                return self.get_frame_time(len(self.times)-1)
+                return self.get_frame_time(len(self.times) - 1)
             if self.times:
                 return self.times[-1] + (self.default_frame_duration) * (number - len(self.times) + 1)
             else:
@@ -157,7 +158,7 @@ class Timecodes(object):
     def get_frame_size(self, timestamp):
         try:
             number = bisect.bisect_left(self.times, timestamp)
-        except:
+        except Exception:
             return self.default_frame_duration
 
         c = self.get_frame_time(number)
@@ -353,4 +354,3 @@ class Demuxer(object):
             raise SushiError("Stream with index {0} doesn't exist in {1}.\n"
                              "Here are all that do:\n"
                              "{2}".format(chosen_idx, self._path, self._format_streams_list(streams)))
-

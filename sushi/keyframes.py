@@ -2,7 +2,8 @@ from .common import SushiError, read_all_text
 
 
 def parse_scxvid_keyframes(text):
-    return [i-3 for i,line in enumerate(text.splitlines()) if line and line[0] == 'i']
+    return [i - 3 for i, line in enumerate(text.splitlines()) if line and line[0] == 'i']
+
 
 def parse_keyframes(path):
     text = read_all_text(path)

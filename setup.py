@@ -9,4 +9,3 @@ setup(
     console=['sushi.py'],
     license='MIT'
 )
-

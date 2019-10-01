@@ -5,7 +5,6 @@ import operator
 import argparse
 import os
 import bisect
-import collections
 from itertools import takewhile, chain
 import time
 
@@ -57,7 +56,7 @@ class ColoredLogFormatter(logging.Formatter):
         elif record.levelno == logging.WARN:
             self._fmt = self.warn_format
         elif record.levelno == logging.ERROR or record.levelno == logging.CRITICAL:
-            self._fmt =  self.error_format
+            self._fmt = self.error_format
         else:
             self._fmt = self.default_format
 
@@ -101,8 +100,8 @@ def running_median(values, window_size):
     medians = []
     items_count = len(values)
     for idx in range(items_count):
-        radius = min(half_window, idx, items_count-idx-1)
-        med = np.median(values[idx-radius:idx+radius+1])
+        radius = min(half_window, idx, items_count - idx - 1)
+        med = np.median(values[idx - radius:idx + radius + 1])
         medians.append(med)
     return medians
 
@@ -110,7 +109,7 @@ def running_median(values, window_size):
 def smooth_events(events, radius):
     if not radius:
         return
-    window_size = radius*2+1
+    window_size = radius * 2 + 1
     shifts = [e.shift for e in events]
     smoothed = running_median(shifts, window_size)
     for event, new_shift in zip(events, smoothed):
@@ -254,7 +253,7 @@ def find_keyframes_distances(event, src_keytimes, dst_keytimes, timecodes, max_k
         dst = get_distance_to_closest_kf(dst_time, dst_keytimes)
         snapping_limit = timecodes.get_frame_size(src_time) * max_kf_distance
 
-        if abs(src) < snapping_limit and abs(dst) < snapping_limit and abs(src-dst) < snapping_limit:
+        if abs(src) < snapping_limit and abs(dst) < snapping_limit and abs(src - dst) < snapping_limit:
             return dst - src
         return 0
 
@@ -285,7 +284,7 @@ def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_dist
 
             logging.info('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), mean_shift))
             for group, (start_shift, end_shift) in zip(groups, shifts):
-                if abs(start_shift-end_shift) > 0.001 and len(group) > 1:
+                if abs(start_shift - end_shift) > 0.001 and len(group) > 1:
                     actual_shift = min(start_shift, end_shift, key=lambda x: abs(x - mean_shift))
                     logging.warning("Typesetting group at {0} had different shift at start/end points ({1} and {2}). Shifting by {3}."
                                     .format(format_time(group[0].start), start_shift, end_shift, actual_shift))
@@ -336,7 +335,7 @@ def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts
         else:
             group = [event]
             group_end = event.end
-            i = idx+1
+            i = idx + 1
             while i < len(events) and abs(group_end - events[i].start) < max_ts_distance:
                 if events[i].end < next_chapter and events[i].duration <= max_ts_duration:
                     processed.add(i)
@@ -354,7 +353,7 @@ def prepare_search_groups(events, source_duration, chapter_times, max_ts_duratio
     for idx, event in enumerate(events):
         if event.is_comment:
             try:
-                event.link_event(events[idx+1])
+                event.link_event(events[idx + 1])
             except IndexError:
                 event.link_event(last_unlinked)
             continue
@@ -372,8 +371,9 @@ def prepare_search_groups(events, source_duration, chapter_times, max_ts_duratio
 
         # link lines with start and end times identical to some other event
         # assuming scripts are sorted by start time so we don't search the entire collection
-        same_start = lambda x: event.start == x.start
-        processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end),None)
+        def same_start(x):
+            return event.start == x.start
+        processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end), None)
         if processed:
             event.link_event(processed)
         else:
@@ -442,7 +442,7 @@ def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_win
                 idx += 1
                 continue
 
-        left_audio_half, right_audio_half = np.split(tv_audio, [len(tv_audio[0])/2], axis=1)
+        left_audio_half, right_audio_half = np.split(tv_audio, [len(tv_audio[0]) / 2], axis=1)
         right_half_offset = len(left_audio_half[0]) / float(src_stream.sample_rate)
         terminate = False
         # searching from last committed shift
@@ -456,7 +456,7 @@ def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_win
 
         if not terminate and uncommitted_states and uncommitted_states[-1]["shift"] is not None \
                 and original_time + uncommitted_states[-1]["shift"] < dst_stream.duration_seconds:
-            start_offset =  uncommitted_states[-1]["shift"]
+            start_offset = uncommitted_states[-1]["shift"]
             diff, new_time = dst_stream.find_substream(tv_audio, original_time + start_offset, window)
             left_side_time = dst_stream.find_substream(left_audio_half, original_time + start_offset, window)[1]
             right_side_time = dst_stream.find_substream(right_audio_half, original_time + start_offset + right_half_offset, window)[1] - right_half_offset
@@ -580,7 +580,7 @@ def run(args):
         src_script_path = args.script_file
     else:
         stype = src_demuxer.get_subs_type(args.src_script_idx)
-        src_script_path = format_full_path(args.temp_dir, args.source, '.sushi'+ stype)
+        src_script_path = format_full_path(args.temp_dir, args.source, '.sushi' + stype)
         src_demuxer.set_script(stream_idx=args.src_script_idx, output_path=src_script_path)
 
     script_extension = get_extension(src_script_path)
@@ -726,7 +726,7 @@ def run(args):
         script.save_to_file(dst_script_path)
 
         if write_plot:
-            plt.plot([x.shift + (x._start_shift + x._end_shift)/2.0 for x in events], label='After correction')
+            plt.plot([x.shift + (x._start_shift + x._end_shift) / 2.0 for x in events], label='After correction')
             plt.legend(fontsize=5, frameon=False, fancybox=False)
             plt.savefig(args.plot_path, dpi=300)
 

@@ -95,7 +95,7 @@ class SrtEvent(ScriptEventBase):
     is_comment = False
     style = None
 
-    EVENT_REGEX = re.compile("""
+    EVENT_REGEX = re.compile(r"""
                                (\d+?)\s+? # line-number
                                (\d{1,2}:\d{1,2}:\d{1,2},\d+)\s-->\s(\d{1,2}:\d{1,2}:\d{1,2},\d+).  # timestamp
                                (.+?) # actual text
@@ -207,7 +207,7 @@ class AssScript(ScriptBase):
         def parse_event_line(line):
             if line.startswith('Format:'):
                 return
-            events.append(AssEvent(line, position=len(events)+1))
+            events.append(AssEvent(line, position=len(events) + 1))
 
         def create_generic_parse(section_name):
             if section_name in other_sections:
