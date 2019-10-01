@@ -5,8 +5,8 @@ from collections import namedtuple
 import logging
 import bisect
 
-from common import SushiError, get_extension
-import chapters
+from .common import SushiError, get_extension
+from . import chapters
 
 MediaStreamInfo = namedtuple('MediaStreamInfo', ['id', 'info', 'default', 'title'])
 SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', 'default', 'title'])

@@ -1,9 +1,9 @@
 import unittest
 import mock
 
-from demux import FFmpeg, MkvToolnix, SCXviD
-from common import SushiError
-import chapters
+from sushi.demux import FFmpeg, MkvToolnix, SCXviD
+from sushi.common import SushiError
+from sushi import chapters
 
 
 def create_popen_mock():

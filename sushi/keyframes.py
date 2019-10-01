@@ -1,4 +1,4 @@
-from common import SushiError, read_all_text
+from .common import SushiError, read_all_text
 
 
 def parse_scxvid_keyframes(text):

@@ -1,5 +1,5 @@
 import re
-import common
+from . import common
 
 
 def parse_times(times):

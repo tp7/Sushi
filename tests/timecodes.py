@@ -1,5 +1,6 @@
 import unittest
-from demux import Timecodes
+
+from sushi.demux import Timecodes
 
 
 class CfrTimecodesTestCase(unittest.TestCase):

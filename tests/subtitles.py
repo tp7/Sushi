@@ -2,7 +2,8 @@ import unittest
 import tempfile
 import os
 import codecs
-from subs import AssEvent, AssScript, SrtEvent, SrtScript
+
+from sushi.subs import AssEvent, AssScript, SrtEvent, SrtScript
 
 SINGLE_LINE_SRT_EVENT = """1
 00:14:21,960 --> 00:14:22,960

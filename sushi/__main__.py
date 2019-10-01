@@ -11,12 +11,12 @@ import time
 
 import numpy as np
 
-import chapters
-from common import SushiError, get_extension, format_time, ensure_static_collection
-from demux import Timecodes, Demuxer
-import keyframes
-from subs import AssScript, SrtScript
-from wav import WavStream
+from . import chapters
+from .common import SushiError, get_extension, format_time, ensure_static_collection
+from .demux import Timecodes, Demuxer
+from . import keyframes
+from .subs import AssScript, SrtScript
+from .wav import WavStream
 
 
 try:

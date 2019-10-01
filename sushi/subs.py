@@ -3,7 +3,7 @@ import os
 import re
 import collections
 
-from common import SushiError, format_time, format_srt_time
+from .common import SushiError, format_time, format_srt_time
 
 
 def _parse_ass_time(string):

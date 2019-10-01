@@ -6,7 +6,8 @@ import struct
 import math
 from time import time
 import os.path
-from common import SushiError, clip
+
+from .common import SushiError, clip
 
 WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_EXTENSIBLE = 0xFFFE

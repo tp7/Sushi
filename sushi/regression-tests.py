@@ -9,10 +9,10 @@ import re
 import subprocess
 import argparse
 
-from common import format_time
-from demux import Timecodes
-from subs import AssScript
-from wav import WavStream
+from .common import format_time
+from .demux import Timecodes
+from .subs import AssScript
+from .wav import WavStream
 
 
 root_logger = logging.getLogger('')

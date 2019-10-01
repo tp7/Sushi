@@ -3,8 +3,9 @@ import os
 import re
 import unittest
 from mock import patch, ANY
-from common import SushiError, format_time
-import sushi
+
+from sushi.common import SushiError, format_time
+from sushi import __main__ as sushi
 
 here = os.path.dirname(os.path.abspath(__file__))
 
