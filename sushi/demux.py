@@ -17,7 +17,8 @@ class FFmpeg(object):
     @staticmethod
     def get_info(path):
         try:
-            process = subprocess.Popen(['ffmpeg', '-hide_banner', '-i', path], stderr=subprocess.PIPE)
+            # text=True is an alias for universal_newlines since 3.7
+            process = subprocess.Popen(['ffmpeg', '-hide_banner', '-i', path], stderr=subprocess.PIPE, universal_newlines=True)
             out, err = process.communicate()
             process.wait()
             return err

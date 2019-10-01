@@ -79,9 +79,6 @@ class ScriptEventBase(object):
         assert not self.linked, 'Cannot adjust time of linked events'
         self._shift += value
 
-    def __repr__(self):
-        return str(self)
-
 
 class ScriptBase(object):
     def __init__(self, events):
@@ -112,7 +109,7 @@ class SrtEvent(ScriptEventBase):
         end = cls.parse_time(match.group(3))
         return SrtEvent(int(match.group(1)), start, end, match.group(4).strip())
 
-    def __unicode__(self):
+    def __str__(self):
         return '{0}\n{1} --> {2}\n{3}'.format(self.source_index, self._format_time(self.start),
                                               self._format_time(self.end), self.text)
 
@@ -168,7 +165,7 @@ class AssEvent(ScriptEventBase):
         self.margin_vertical = split[7]
         self.effect = split[8]
 
-    def __unicode__(self):
+    def __str__(self):
         return '{0}: {1},{2},{3},{4},{5},{6},{7},{8},{9},{10}'.format(self.kind, self.layer,
                                                                       self._format_time(self.start),
                                                                       self._format_time(self.end),
