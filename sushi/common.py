@@ -22,7 +22,7 @@ def ensure_static_collection(value):
 
 def format_srt_time(seconds):
     cs = round(seconds * 1000)
-    return u'{0:02d}:{1:02d}:{2:02d},{3:03d}'.format(
+    return '{0:02d}:{1:02d}:{2:02d},{3:03d}'.format(
         int(cs // 3600000),
         int((cs // 60000) % 60),
         int((cs // 1000) % 60),
@@ -31,7 +31,7 @@ def format_srt_time(seconds):
 
 def format_time(seconds):
     cs = round(seconds * 100)
-    return u'{0}:{1:02d}:{2:02d}.{3:02d}'.format(
+    return '{0}:{1:02d}:{2:02d}.{3:02d}'.format(
             int(cs // 360000),
             int((cs // 6000) % 60),
             int((cs // 100) % 60),

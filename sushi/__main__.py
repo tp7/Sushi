@@ -6,7 +6,7 @@ import argparse
 import os
 import bisect
 import collections
-from itertools import takewhile, izip, chain
+from itertools import takewhile, chain
 import time
 
 import numpy as np
@@ -70,26 +70,26 @@ def abs_diff(a, b):
 
 def interpolate_nones(data, points):
     data = ensure_static_collection(data)
-    values_lookup = {p: v for p, v in izip(points, data) if v is not None}
+    values_lookup = {p: v for p, v in zip(points, data) if v is not None}
     if not values_lookup:
         return []
 
-    zero_points = {p for p, v in izip(points, data) if v is None}
+    zero_points = {p for p, v in zip(points, data) if v is None}
     if not zero_points:
         return data
 
-    data_list = sorted(values_lookup.iteritems())
+    data_list = sorted(values_lookup.items())
     zero_points = sorted(x for x in zero_points if x not in values_lookup)
 
     out = np.interp(x=zero_points,
-                    xp=map(operator.itemgetter(0), data_list),
-                    fp=map(operator.itemgetter(1), data_list))
+                    xp=list(map(operator.itemgetter(0), data_list)),
+                    fp=list(map(operator.itemgetter(1), data_list)))
 
-    values_lookup.update(izip(zero_points, out))
+    values_lookup.update(zip(zero_points, out))
 
     return [
         values_lookup[point] if value is None else value
-        for point, value in izip(points, data)
+        for point, value in zip(points, data)
     ]
 
 
@@ -100,7 +100,7 @@ def running_median(values, window_size):
     half_window = window_size // 2
     medians = []
     items_count = len(values)
-    for idx in xrange(items_count):
+    for idx in range(items_count):
         radius = min(half_window, idx, items_count-idx-1)
         med = np.median(values[idx-radius:idx+radius+1])
         medians.append(med)
@@ -113,7 +113,7 @@ def smooth_events(events, radius):
     window_size = radius*2+1
     shifts = [e.shift for e in events]
     smoothed = running_median(shifts, window_size)
-    for event, new_shift in izip(events, smoothed):
+    for event, new_shift in zip(events, smoothed):
         event.set_shift(new_shift, event.diff)
 
 
@@ -128,7 +128,7 @@ def detect_groups(events_iter):
 
 
 def groups_from_chapters(events, times):
-    logging.info(u'Chapter start points: {0}'.format([format_time(t) for t in times]))
+    logging.info('Chapter start points: {0}'.format([format_time(t) for t in times]))
     groups = [[]]
     chapter_times = iter(times[1:] + [36000000000])  # very large event at the end
     current_chapter = next(chapter_times)
@@ -141,7 +141,7 @@ def groups_from_chapters(events, times):
 
         groups[-1].append(event)
 
-    groups = filter(None, groups)  # non-empty groups
+    groups = [g for g in groups if g]  # non-empty groups
     # check if we have any groups where every event is linked
     # for example a chapter with only comments inside
     broken_groups = [group for group in groups if not any(e for e in group if not e.linked)]
@@ -152,7 +152,7 @@ def groups_from_chapters(events, times):
                 parent_group = next(group for group in groups if parent in group)
                 parent_group.append(event)
             del group[:]
-        groups = filter(None, groups)
+        groups = [g for g in groups if g]
         # re-sort the groups again since we might break the order when inserting linked events
         # sorting everything again is far from optimal but python sorting is very fast for sorted arrays anyway
         for group in groups:
@@ -167,9 +167,9 @@ def split_broken_groups(groups):
     for g in groups:
         std = np.std([e.shift for e in g])
         if std > MAX_GROUP_STD:
-            logging.warn(u'Shift is not consistent between {0} and {1}, most likely chapters are wrong (std: {2}). '
-                         u'Switching to automatic grouping.'.format(format_time(g[0].start), format_time(g[-1].end),
-                                                                    std))
+            logging.warn('Shift is not consistent between {0} and {1}, most likely chapters are wrong (std: {2}). '
+                         'Switching to automatic grouping.'.format(format_time(g[0].start), format_time(g[-1].end),
+                                                                   std))
             correct_groups.extend(detect_groups(g))
             broken_found = True
         else:
@@ -281,10 +281,10 @@ def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_dist
         shifts = interpolate_nones(shifts, times)
         if shifts:
             mean_shift = np.mean(shifts)
-            shifts = zip(*(iter(shifts), ) * 2)
+            shifts = zip(*[iter(shifts)] * 2)
 
             logging.info('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), mean_shift))
-            for group, (start_shift, end_shift) in izip(groups, shifts):
+            for group, (start_shift, end_shift) in zip(groups, shifts):
                 if abs(start_shift-end_shift) > 0.001 and len(group) > 1:
                     actual_shift = min(start_shift, end_shift, key=lambda x: abs(x - mean_shift))
                     logging.warning("Typesetting group at {0} had different shift at start/end points ({1} and {2}). Shifting by {3}."
@@ -359,7 +359,7 @@ def prepare_search_groups(events, source_duration, chapter_times, max_ts_duratio
                 event.link_event(last_unlinked)
             continue
         if (event.start + event.duration / 2.0) > source_duration:
-            logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
+            logging.info('Event time outside of audio range, ignoring: %s', event)
             event.link_event(last_unlinked)
             continue
         elif event.end == event.start:
@@ -400,7 +400,7 @@ def prepare_search_groups(events, source_duration, chapter_times, max_ts_duratio
 def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_window, rewind_thresh):
     def log_shift(state):
         logging.info('{0}-{1}: shift: {2:0.10f}, diff: {3:0.10f}'
-                      .format(format_time(state["start_time"]), format_time(state["end_time"]), state["shift"], state["diff"]))
+                     .format(format_time(state["start_time"]), format_time(state["end_time"]), state["shift"], state["diff"]))
 
     def log_uncommitted(state, shift, left_side_shift, right_side_shift, search_offset):
         logging.debug('{0}-{1}: shift: {2:0.5f} [{3:0.5f}, {4:0.5f}], search offset: {5:0.6f}'
@@ -495,7 +495,7 @@ def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_win
     for state in uncommitted_states:
         log_shift(state)
 
-    for idx, (search_group, group_state) in enumerate(izip(groups_list, chain(committed_states, uncommitted_states))):
+    for idx, (search_group, group_state) in enumerate(zip(groups_list, chain(committed_states, uncommitted_states))):
         if group_state["shift"] is None:
             for group in reversed(groups_list[:idx]):
                 link_to = next((x for x in reversed(group) if not x.linked), None)
@@ -698,8 +698,8 @@ def run(args):
                 start_shift = g[0].shift
                 end_shift = g[-1].shift
                 avg_shift = average_shifts(g)
-                logging.info(u'Group (start: {0}, end: {1}, lines: {2}), '
-                             u'shifts (start: {3}, end: {4}, average: {5})'
+                logging.info('Group (start: {0}, end: {1}, lines: {2}), '
+                             'shifts (start: {3}, end: {4}, average: {5})'
                              .format(format_time(g[0].start), format_time(g[-1].end), len(g), start_shift, end_shift,
                                      avg_shift))
 

@@ -75,7 +75,7 @@ class FFmpeg(object):
 
     @staticmethod
     def _get_chapters_times(info):
-        return map(float, re.findall(r'Chapter #0.\d+: start (\d+\.\d+)', info))
+        return list(map(float, re.findall(r'Chapter #0.\d+: start (\d+\.\d+)', info)))
 
     @staticmethod
     def _get_subtitles_streams(info):

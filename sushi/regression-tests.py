@@ -54,19 +54,19 @@ def compare_scripts(ideal_path, test_path, timecodes, test_name, expected_errors
         test_end_frame = timecodes.get_frame_number(test.end)
 
         if ideal_start_frame != test_start_frame and ideal_end_frame != test_end_frame:
-            logging.debug(u'{0}: start and end time failed at "{1}". {2}-{3} vs {4}-{5}'.format(
+            logging.debug('{0}: start and end time failed at "{1}". {2}-{3} vs {4}-{5}'.format(
                 idx, strip_tags(ideal.text), ft(ideal.start), ft(ideal.end), ft(test.start), ft(test.end))
             )
             failed += 1
         elif ideal_end_frame != test_end_frame:
             logging.debug(
-                u'{0}: end time failed at "{1}". {2} vs {3}'.format(
+                '{0}: end time failed at "{1}". {2} vs {3}'.format(
                     idx, strip_tags(ideal.text), ft(ideal.end), ft(test.end))
             )
             failed += 1
         elif ideal_start_frame != test_start_frame:
             logging.debug(
-                u'{0}: start time failed at "{1}". {2} vs {3}'.format(
+                '{0}: start time failed at "{1}". {2} vs {3}'.format(
                     idx, strip_tags(ideal.text), ft(ideal.start), ft(test.start))
             )
             failed += 1
@@ -189,7 +189,7 @@ def run():
         return not args.run_only or name in args.run_only
 
     failed = ran = 0
-    for test_name, params in config.get('tests', {}).iteritems():
+    for test_name, params in config.get('tests', {}).items():
         if not should_run(test_name):
             continue
         if not params.get('disabled', False):
@@ -201,7 +201,7 @@ def run():
             logging.warn('Test "{0}" disabled'.format(test_name))
 
     if should_run("wavs"):
-        for test_name, params in config.get('wavs', {}).iteritems():
+        for test_name, params in config.get('wavs', {}).items():
             ran += 1
             if not run_wav_test(test_name, os.path.join(config['basepath'], params['file']), params):
                 failed += 1

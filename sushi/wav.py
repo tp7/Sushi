@@ -8,6 +8,7 @@ from time import time
 import os.path
 
 from .common import SushiError, clip
+from functools import reduce
 
 WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_EXTENSIBLE = 0xFFFE
@@ -86,7 +87,7 @@ class DownmixedWavFile(object):
             if min_length != real_length:
                 logging.error("Length of audio channels didn't match. This might result in broken output")
 
-            channels = (unpacked[i::self.channels_count] for i in xrange(self.channels_count))
+            channels = (unpacked[i::self.channels_count] for i in range(self.channels_count))
             data = reduce(lambda a, b: a[:min_length]+b[:min_length], channels)
             data /= float(self.channels_count)
             return data

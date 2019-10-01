@@ -2,7 +2,7 @@ from collections import namedtuple
 import os
 import re
 import unittest
-from mock import patch, ANY
+from unittest.mock import patch, ANY
 
 from sushi.common import SushiError, format_time
 from sushi import __main__ as sushi
@@ -34,7 +34,7 @@ class FakeEvent(object):
 
 class InterpolateNonesTestCase(unittest.TestCase):
     def test_returns_empty_array_when_passed_empty_array(self):
-        self.assertEquals(sushi.interpolate_nones([], []), [])
+        self.assertEqual(sushi.interpolate_nones([], []), [])
 
     def test_returns_false_when_no_valid_points(self):
         self.assertFalse(sushi.interpolate_nones([None, None, None], [1, 2, 3]))
@@ -112,7 +112,7 @@ class GroupsFromChaptersTestCase(unittest.TestCase):
         self.assertItemsEqual([events[1], events[2]], groups[1])
 
     def test_multiple_groups_multiple_chapters(self):
-        events = [FakeEvent(end=x) for x in xrange(1, 10)]
+        events = [FakeEvent(end=x) for x in range(1, 10)]
         groups = sushi.groups_from_chapters(events, [0.0, 3.2, 4.4, 7.7])
         self.assertEqual(4, len(groups))
         self.assertItemsEqual(events[0:3], groups[0])
@@ -207,16 +207,16 @@ class MainScriptTestCase(unittest.TestCase):
 
     def test_raises_on_unknown_script_type(self, ignore):
         keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.mp4']
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*type'), lambda: sushi.parse_args_and_run(keys))
+        self.assertRaisesRegex(SushiError, self.any_case_regex(r'script.*type'), lambda: sushi.parse_args_and_run(keys))
 
     def test_raises_on_script_type_not_matching(self, ignore):
         keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.ass', '-o', 'd.srt']
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*type.*match'),
-                                lambda: sushi.parse_args_and_run(keys))
+        self.assertRaisesRegex(SushiError, self.any_case_regex(r'script.*type.*match'),
+                               lambda: sushi.parse_args_and_run(keys))
 
     def test_raises_on_timecodes_and_fps_being_defined_together(self, ignore):
         keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.ass', '--src-timecodes', 'tc.txt', '--src-fps', '25']
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'timecodes'), lambda: sushi.parse_args_and_run(keys))
+        self.assertRaisesRegex(SushiError, self.any_case_regex(r'timecodes'), lambda: sushi.parse_args_and_run(keys))
 
 
 class FormatTimeTestCase(unittest.TestCase):

@@ -5,7 +5,7 @@ from . import common
 def parse_times(times):
     result = []
     for t in times:
-        hours, minutes, seconds = map(float, t.split(':'))
+        hours, minutes, seconds = list(map(float, t.split(':')))
         result.append(hours * 3600 + minutes * 60 + seconds)
 
     result.sort()
