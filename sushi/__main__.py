@@ -140,9 +140,13 @@ def parse_args_and_run(cmd_keys):
     logging.info('Done in {0}s'.format(time.time() - start_time))
 
 
-if __name__ == '__main__':
+def main():
     try:
         parse_args_and_run(sys.argv[1:])
     except SushiError as e:
         logging.critical(e.message)
         sys.exit(2)
+
+
+if __name__ == '__main__':
+    main()

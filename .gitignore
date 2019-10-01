@@ -5,3 +5,4 @@ tests/media
 dist
 build
 tests.json
+*.egg-info
