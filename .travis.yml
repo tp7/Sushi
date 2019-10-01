@@ -1,18 +1,24 @@
 language: python
+matrix:
+  include:
+    - name: "Python 3.5 on Xenial"
+      dist: xenial
+      python: 3.5
+    - name: "Python 3.6 on Bionic"
+      dist: bionic
+      python: 3.6
 
 virtualenv:
   system_site_packages: true
+
 before_install:
   - sudo apt-get update
-  - sudo apt-get install python-opencv
-  - sudo dpkg -L python-opencv
+  - sudo apt-get install python3-opencv
+  - sudo dpkg -L python3-opencv
   - sudo ln /dev/null /dev/raw1394
+
 install:
   - pip install -r requirements.txt
 
-python:
-  - "3.5"
-  - "3.6"
-  - "3.7"
 script:
   - python run-tests.py
