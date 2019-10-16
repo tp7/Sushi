@@ -22,9 +22,9 @@ class DownmixedWavFile(object):
         self._file = open(path, 'rb')
         try:
             riff = Chunk(self._file, bigendian=False)
-            if riff.getname() != 'RIFF':
+            if riff.getname() != b'RIFF':
                 raise SushiError('File does not start with RIFF id')
-            if riff.read(4) != 'WAVE':
+            if riff.read(4) != b'WAVE':
                 raise SushiError('Not a WAVE file')
 
             fmt_chunk_read = False
@@ -37,10 +37,10 @@ class DownmixedWavFile(object):
                 except EOFError:
                     break
 
-                if chunk.getname() == 'fmt ':
+                if chunk.getname() == b'fmt ':
                     self._read_fmt_chunk(chunk)
                     fmt_chunk_read = True
-                elif chunk.getname() == 'data':
+                elif chunk.getname() == b'data':
                     if file_size > 0xFFFFFFFF:
                         # large broken wav
                         self.frames_count = (file_size - self._file.tell()) // self.frame_size
