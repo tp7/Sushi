@@ -4,7 +4,8 @@ pyinstaller --noupx --onefile --noconfirm ^
 	--exclude-module Tkconstants ^
 	--exclude-module Tkinter ^
 	--exclude-module matplotlib ^
-	sushi.py
+	--name sushi ^
+	sushi/__main__.py
 
 mkdir dist\licenses
 copy /Y licenses\* dist\licenses\*

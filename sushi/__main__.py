@@ -4,8 +4,10 @@ import os
 import sys
 import time
 
-from . import run, VERSION
-from .common import SushiError
+# Use absolute imports to support pyinstaller
+# https://github.com/pyinstaller/pyinstaller/issues/2560
+from sushi import run, VERSION
+from sushi.common import SushiError
 
 if sys.platform == 'win32':
     try:
