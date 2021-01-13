@@ -146,7 +146,7 @@ def main():
     try:
         parse_args_and_run(sys.argv[1:])
     except SushiError as e:
-        logging.critical(e.message)
+        logging.critical(e.args[0])
         sys.exit(2)
 
 
