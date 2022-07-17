@@ -18,7 +18,8 @@ class FFmpeg(object):
     def get_info(path):
         try:
             # text=True is an alias for universal_newlines since 3.7
-            process = subprocess.Popen(['ffmpeg', '-hide_banner', '-i', path], stderr=subprocess.PIPE, universal_newlines=True)
+            process = subprocess.Popen(['ffmpeg', '-hide_banner', '-i', path], stderr=subprocess.PIPE,
+                                       universal_newlines=True, encoding='utf-8')
             out, err = process.communicate()
             process.wait()
             return err
