@@ -1,10 +1,11 @@
-from collections import namedtuple
 import os
 import re
 import unittest
-from mock import patch, ANY
-from common import SushiError, format_time
+from unittest.mock import patch, ANY
+
+from sushi.common import SushiError, format_time
 import sushi
+from sushi import __main__ as main
 
 here = os.path.dirname(os.path.abspath(__file__))
 
@@ -33,7 +34,7 @@ class FakeEvent(object):
 
 class InterpolateNonesTestCase(unittest.TestCase):
     def test_returns_empty_array_when_passed_empty_array(self):
-        self.assertEquals(sushi.interpolate_nones([], []), [])
+        self.assertEqual(sushi.interpolate_nones([], []), [])
 
     def test_returns_false_when_no_valid_points(self):
         self.assertFalse(sushi.interpolate_nones([None, None, None], [1, 2, 3]))
@@ -107,24 +108,24 @@ class GroupsFromChaptersTestCase(unittest.TestCase):
         events = [FakeEvent(end=1), FakeEvent(end=2), FakeEvent(end=3)]
         groups = sushi.groups_from_chapters(events, [0.0, 1.5])
         self.assertEqual(2, len(groups))
-        self.assertItemsEqual([events[0]], groups[0])
-        self.assertItemsEqual([events[1], events[2]], groups[1])
+        self.assertEqual([events[0]], groups[0])
+        self.assertEqual([events[1], events[2]], groups[1])
 
     def test_multiple_groups_multiple_chapters(self):
-        events = [FakeEvent(end=x) for x in xrange(1, 10)]
+        events = [FakeEvent(end=x) for x in range(1, 10)]
         groups = sushi.groups_from_chapters(events, [0.0, 3.2, 4.4, 7.7])
         self.assertEqual(4, len(groups))
-        self.assertItemsEqual(events[0:3], groups[0])
-        self.assertItemsEqual(events[3:4], groups[1])
-        self.assertItemsEqual(events[4:7], groups[2])
-        self.assertItemsEqual(events[7:9], groups[3])
+        self.assertEqual(events[0:3], groups[0])
+        self.assertEqual(events[3:4], groups[1])
+        self.assertEqual(events[4:7], groups[2])
+        self.assertEqual(events[7:9], groups[3])
 
 
 class SplitBrokenGroupsTestCase(unittest.TestCase):
     def test_doing_nothing_on_correct_groups(self):
         groups = [[FakeEvent(0.5), FakeEvent(0.5)], [FakeEvent(10.0)]]
         fixed = sushi.split_broken_groups(groups)
-        self.assertItemsEqual(groups, fixed)
+        self.assertEqual(groups, fixed)
 
     def test_split_groups_without_merging(self):
         groups = [
@@ -132,7 +133,7 @@ class SplitBrokenGroupsTestCase(unittest.TestCase):
             [FakeEvent(0.5)] * 10,
         ]
         fixed = sushi.split_broken_groups(groups)
-        self.assertItemsEqual([
+        self.assertEqual([
             [FakeEvent(0.5)] * 10,
             [FakeEvent(10.0)] * 5,
             [FakeEvent(0.5)] * 10
@@ -144,7 +145,7 @@ class SplitBrokenGroupsTestCase(unittest.TestCase):
             [FakeEvent(10.0), FakeEvent(10.0), FakeEvent(15.0)]
         ]
         fixed = sushi.split_broken_groups(groups)
-        self.assertItemsEqual([
+        self.assertEqual([
             [FakeEvent(0.5)],
             [FakeEvent(10.0), FakeEvent(10.0), FakeEvent(10.0)],
             [FakeEvent(15.0)]
@@ -192,7 +193,7 @@ class MainScriptTestCase(unittest.TestCase):
                 '--dst-keyframes', 'dst-keyframes', '--src-keyframes', 'src-keyframes',
                 '--src-timecodes', 'src-tcs', '--dst-timecodes', 'dst-tcs']
         try:
-            sushi.parse_args_and_run(keys)
+            main.parse_args_and_run(keys)
         except SushiError:
             pass
         mock_object.assert_any_call('src', ANY)
@@ -206,16 +207,16 @@ class MainScriptTestCase(unittest.TestCase):
 
     def test_raises_on_unknown_script_type(self, ignore):
         keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.mp4']
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*type'), lambda: sushi.parse_args_and_run(keys))
+        self.assertRaisesRegex(SushiError, self.any_case_regex(r'script.*type'), lambda: main.parse_args_and_run(keys))
 
     def test_raises_on_script_type_not_matching(self, ignore):
         keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.ass', '-o', 'd.srt']
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'script.*type.*match'),
-                                lambda: sushi.parse_args_and_run(keys))
+        self.assertRaisesRegex(SushiError, self.any_case_regex(r'script.*type.*match'),
+                               lambda: main.parse_args_and_run(keys))
 
     def test_raises_on_timecodes_and_fps_being_defined_together(self, ignore):
         keys = ['--src', 's.wav', '--dst', 'd.wav', '--script', 's.ass', '--src-timecodes', 'tc.txt', '--src-fps', '25']
-        self.assertRaisesRegexp(SushiError, self.any_case_regex(r'timecodes'), lambda: sushi.parse_args_and_run(keys))
+        self.assertRaisesRegex(SushiError, self.any_case_regex(r'timecodes'), lambda: main.parse_args_and_run(keys))
 
 
 class FormatTimeTestCase(unittest.TestCase):

@@ -26,9 +26,9 @@ Do note that WAV is not the only format Sushi can work with. It can process audi
 ### Requirements
 Sushi should work on Windows, Linux and OS X. Please open an issue if it doesn't. To run it, you have to have the following installed:
 
-1. [Python 2.7.x][5]
+1. [Python 3.5 or higher][5]
 2. [NumPy][6] (1.8 or newer)
-3. [OpenCV 2.4.x or newer][7] (on Windows putting [this file][8] in the same folder as Sushi should be enough, assuming you use x86 Python)
+3. [OpenCV 2.4.x or newer][7]
 
 Optionally, you might want:
 
@@ -41,16 +41,21 @@ The provided Windows binaries include all required components and Colorama so yo
 
 #### Installation on Mac OS X
 
-No binary packages are provided for OS X right now so you'll have to use the script form. Assuming you have python 2, pip and [homebrew](http://brew.sh/) installed, run the following:
+No binary packages are provided for OS X right now so you'll have to use the script form. Assuming you have Python 3, pip and [homebrew](http://brew.sh/) installed, run the following:
 ```bash
 brew tap homebrew/science
 brew install git opencv
-pip install numpy
-git clone https://github.com/tp7/sushi
-# create a symlink if you want to run sushi globally
-ln -s `pwd`/sushi/sushi.py /usr/local/bin/sushi
+pip3 install numpy
 # install some optional dependencies
 brew install ffmpeg mkvtoolnix
+
+# fetch sushi
+git clone https://github.com/tp7/sushi
+# run from source
+python3 -m sushi args…
+# install globally (for your user)
+python3 setup.py install --user
+sushi args…
 ```
 If you don't have pip, you can install numpy with homebrew, but that will probably add a few more dependencies.
 ```bash
@@ -62,9 +67,13 @@ brew install numpy
 If you have apt-get available, the installation process is trivial.
 ```bash
 sudo apt-get update
-sudo apt-get install git python python-numpy python-opencv
+sudo apt-get install git python3 python3-numpy python3-opencv
 git clone https://github.com/tp7/sushi
-ln -s `pwd`/sushi/sushi.py /usr/local/bin/sushi
+# run from source
+python3 -m sushi args…
+# install globally (for your user; ensure ~/.local/bin is in your PATH)
+python3 setup.py install --user
+sushi args…
 ```
 
 ### Limitations
@@ -82,7 +91,6 @@ In short, while this might be safe for immediate viewing, you probably shouldn't
   [5]: https://www.python.org/downloads/
   [6]: http://www.scipy.org/scipylib/download.html
   [7]: http://opencv.org/
-  [8]: https://www.dropbox.com/s/nlylgdh4bgrjgxv/cv2.pyd?dl=0
   [9]: http://www.ffmpeg.org/download.html
   [10]: http://www.bunkus.org/videotools/mkvtoolnix/downloads.html
   [11]: https://github.com/soyokaze/SCXvid-standalone/releases

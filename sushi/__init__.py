@@ -1,22 +1,17 @@
-#!/usr/bin/env python2
-import logging
-import sys
-import operator
-import argparse
-import os
 import bisect
-import collections
-from itertools import takewhile, izip, chain
-import time
+from itertools import takewhile, chain
+import logging
+import operator
+import os
 
 import numpy as np
 
-import chapters
-from common import SushiError, get_extension, format_time, ensure_static_collection
-from demux import Timecodes, Demuxer
-import keyframes
-from subs import AssScript, SrtScript
-from wav import WavStream
+from . import chapters
+from .common import SushiError, get_extension, format_time, ensure_static_collection
+from .demux import Timecodes, Demuxer
+from . import keyframes
+from .subs import AssScript, SrtScript
+from .wav import WavStream
 
 
 try:
@@ -25,43 +20,10 @@ try:
 except ImportError:
     plot_enabled = False
 
-if sys.platform == 'win32':
-    try:
-        import colorama
-        colorama.init()
-        console_colors_supported = True
-    except ImportError:
-        console_colors_supported = False
-else:
-    console_colors_supported = True
-
 
 ALLOWED_ERROR = 0.01
 MAX_GROUP_STD = 0.025
 VERSION = '0.5.1'
-
-
-class ColoredLogFormatter(logging.Formatter):
-    bold_code = "\033[1m"
-    reset_code = "\033[0m"
-    grey_code = "\033[30m\033[1m"
-
-    error_format = "{bold}ERROR: %(message)s{reset}".format(bold=bold_code, reset=reset_code)
-    warn_format = "{bold}WARNING: %(message)s{reset}".format(bold=bold_code, reset=reset_code)
-    debug_format = "{grey}%(message)s{reset}".format(grey=grey_code, reset=reset_code)
-    default_format = "%(message)s"
-
-    def format(self, record):
-        if record.levelno == logging.DEBUG:
-            self._fmt = self.debug_format
-        elif record.levelno == logging.WARN:
-            self._fmt = self.warn_format
-        elif record.levelno == logging.ERROR or record.levelno == logging.CRITICAL:
-            self._fmt =  self.error_format
-        else:
-            self._fmt = self.default_format
-
-        return super(ColoredLogFormatter, self).format(record)
 
 
 def abs_diff(a, b):
@@ -70,26 +32,26 @@ def abs_diff(a, b):
 
 def interpolate_nones(data, points):
     data = ensure_static_collection(data)
-    values_lookup = {p: v for p, v in izip(points, data) if v is not None}
+    values_lookup = {p: v for p, v in zip(points, data) if v is not None}
     if not values_lookup:
         return []
 
-    zero_points = {p for p, v in izip(points, data) if v is None}
+    zero_points = {p for p, v in zip(points, data) if v is None}
     if not zero_points:
         return data
 
-    data_list = sorted(values_lookup.iteritems())
+    data_list = sorted(values_lookup.items())
     zero_points = sorted(x for x in zero_points if x not in values_lookup)
 
     out = np.interp(x=zero_points,
-                    xp=map(operator.itemgetter(0), data_list),
-                    fp=map(operator.itemgetter(1), data_list))
+                    xp=list(map(operator.itemgetter(0), data_list)),
+                    fp=list(map(operator.itemgetter(1), data_list)))
 
-    values_lookup.update(izip(zero_points, out))
+    values_lookup.update(zip(zero_points, out))
 
     return [
         values_lookup[point] if value is None else value
-        for point, value in izip(points, data)
+        for point, value in zip(points, data)
     ]
 
 
@@ -100,9 +62,9 @@ def running_median(values, window_size):
     half_window = window_size // 2
     medians = []
     items_count = len(values)
-    for idx in xrange(items_count):
-        radius = min(half_window, idx, items_count-idx-1)
-        med = np.median(values[idx-radius:idx+radius+1])
+    for idx in range(items_count):
+        radius = min(half_window, idx, items_count - idx - 1)
+        med = np.median(values[idx - radius:idx + radius + 1])
         medians.append(med)
     return medians
 
@@ -110,10 +72,10 @@ def running_median(values, window_size):
 def smooth_events(events, radius):
     if not radius:
         return
-    window_size = radius*2+1
+    window_size = radius * 2 + 1
     shifts = [e.shift for e in events]
     smoothed = running_median(shifts, window_size)
-    for event, new_shift in izip(events, smoothed):
+    for event, new_shift in zip(events, smoothed):
         event.set_shift(new_shift, event.diff)
 
 
@@ -128,7 +90,7 @@ def detect_groups(events_iter):
 
 
 def groups_from_chapters(events, times):
-    logging.info(u'Chapter start points: {0}'.format([format_time(t) for t in times]))
+    logging.info('Chapter start points: {0}'.format([format_time(t) for t in times]))
     groups = [[]]
     chapter_times = iter(times[1:] + [36000000000])  # very large event at the end
     current_chapter = next(chapter_times)
@@ -141,7 +103,7 @@ def groups_from_chapters(events, times):
 
         groups[-1].append(event)
 
-    groups = filter(None, groups)  # non-empty groups
+    groups = [g for g in groups if g]  # non-empty groups
     # check if we have any groups where every event is linked
     # for example a chapter with only comments inside
     broken_groups = [group for group in groups if not any(e for e in group if not e.linked)]
@@ -152,7 +114,7 @@ def groups_from_chapters(events, times):
                 parent_group = next(group for group in groups if parent in group)
                 parent_group.append(event)
             del group[:]
-        groups = filter(None, groups)
+        groups = [g for g in groups if g]
         # re-sort the groups again since we might break the order when inserting linked events
         # sorting everything again is far from optimal but python sorting is very fast for sorted arrays anyway
         for group in groups:
@@ -167,9 +129,9 @@ def split_broken_groups(groups):
     for g in groups:
         std = np.std([e.shift for e in g])
         if std > MAX_GROUP_STD:
-            logging.warn(u'Shift is not consistent between {0} and {1}, most likely chapters are wrong (std: {2}). '
-                         u'Switching to automatic grouping.'.format(format_time(g[0].start), format_time(g[-1].end),
-                                                                    std))
+            logging.warn('Shift is not consistent between {0} and {1}, most likely chapters are wrong (std: {2}). '
+                         'Switching to automatic grouping.'.format(format_time(g[0].start), format_time(g[-1].end),
+                                                                   std))
             correct_groups.extend(detect_groups(g))
             broken_found = True
         else:
@@ -254,7 +216,7 @@ def find_keyframes_distances(event, src_keytimes, dst_keytimes, timecodes, max_k
         dst = get_distance_to_closest_kf(dst_time, dst_keytimes)
         snapping_limit = timecodes.get_frame_size(src_time) * max_kf_distance
 
-        if abs(src) < snapping_limit and abs(dst) < snapping_limit and abs(src-dst) < snapping_limit:
+        if abs(src) < snapping_limit and abs(dst) < snapping_limit and abs(src - dst) < snapping_limit:
             return dst - src
         return 0
 
@@ -281,11 +243,11 @@ def snap_groups_to_keyframes(events, chapter_times, max_ts_duration, max_ts_dist
         shifts = interpolate_nones(shifts, times)
         if shifts:
             mean_shift = np.mean(shifts)
-            shifts = zip(*(iter(shifts), ) * 2)
+            shifts = zip(*[iter(shifts)] * 2)
 
             logging.info('Group {0}-{1} corrected by {2}'.format(format_time(events[0].start), format_time(events[-1].end), mean_shift))
-            for group, (start_shift, end_shift) in izip(groups, shifts):
-                if abs(start_shift-end_shift) > 0.001 and len(group) > 1:
+            for group, (start_shift, end_shift) in zip(groups, shifts):
+                if abs(start_shift - end_shift) > 0.001 and len(group) > 1:
                     actual_shift = min(start_shift, end_shift, key=lambda x: abs(x - mean_shift))
                     logging.warning("Typesetting group at {0} had different shift at start/end points ({1} and {2}). Shifting by {3}."
                                     .format(format_time(group[0].start), start_shift, end_shift, actual_shift))
@@ -336,7 +298,7 @@ def merge_short_lines_into_groups(events, chapter_times, max_ts_duration, max_ts
         else:
             group = [event]
             group_end = event.end
-            i = idx+1
+            i = idx + 1
             while i < len(events) and abs(group_end - events[i].start) < max_ts_distance:
                 if events[i].end < next_chapter and events[i].duration <= max_ts_duration:
                     processed.add(i)
@@ -354,12 +316,12 @@ def prepare_search_groups(events, source_duration, chapter_times, max_ts_duratio
     for idx, event in enumerate(events):
         if event.is_comment:
             try:
-                event.link_event(events[idx+1])
+                event.link_event(events[idx + 1])
             except IndexError:
                 event.link_event(last_unlinked)
             continue
         if (event.start + event.duration / 2.0) > source_duration:
-            logging.info('Event time outside of audio range, ignoring: %s' % unicode(event))
+            logging.info('Event time outside of audio range, ignoring: %s', event)
             event.link_event(last_unlinked)
             continue
         elif event.end == event.start:
@@ -372,8 +334,9 @@ def prepare_search_groups(events, source_duration, chapter_times, max_ts_duratio
 
         # link lines with start and end times identical to some other event
         # assuming scripts are sorted by start time so we don't search the entire collection
-        same_start = lambda x: event.start == x.start
-        processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end),None)
+        def same_start(x):
+            return event.start == x.start
+        processed = next((x for x in takewhile(same_start, reversed(events[:idx])) if not x.linked and x.end == event.end), None)
         if processed:
             event.link_event(processed)
         else:
@@ -400,7 +363,7 @@ def prepare_search_groups(events, source_duration, chapter_times, max_ts_duratio
 def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_window, rewind_thresh):
     def log_shift(state):
         logging.info('{0}-{1}: shift: {2:0.10f}, diff: {3:0.10f}'
-                      .format(format_time(state["start_time"]), format_time(state["end_time"]), state["shift"], state["diff"]))
+                     .format(format_time(state["start_time"]), format_time(state["end_time"]), state["shift"], state["diff"]))
 
     def log_uncommitted(state, shift, left_side_shift, right_side_shift, search_offset):
         logging.debug('{0}-{1}: shift: {2:0.5f} [{3:0.5f}, {4:0.5f}], search offset: {5:0.6f}'
@@ -442,7 +405,7 @@ def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_win
                 idx += 1
                 continue
 
-        left_audio_half, right_audio_half = np.split(tv_audio, [len(tv_audio[0])/2], axis=1)
+        left_audio_half, right_audio_half = np.split(tv_audio, [len(tv_audio[0]) // 2], axis=1)
         right_half_offset = len(left_audio_half[0]) / float(src_stream.sample_rate)
         terminate = False
         # searching from last committed shift
@@ -456,7 +419,7 @@ def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_win
 
         if not terminate and uncommitted_states and uncommitted_states[-1]["shift"] is not None \
                 and original_time + uncommitted_states[-1]["shift"] < dst_stream.duration_seconds:
-            start_offset =  uncommitted_states[-1]["shift"]
+            start_offset = uncommitted_states[-1]["shift"]
             diff, new_time = dst_stream.find_substream(tv_audio, original_time + start_offset, window)
             left_side_time = dst_stream.find_substream(left_audio_half, original_time + start_offset, window)[1]
             right_side_time = dst_stream.find_substream(right_audio_half, original_time + start_offset + right_half_offset, window)[1] - right_half_offset
@@ -495,7 +458,7 @@ def calculate_shifts(src_stream, dst_stream, groups_list, normal_window, max_win
     for state in uncommitted_states:
         log_shift(state)
 
-    for idx, (search_group, group_state) in enumerate(izip(groups_list, chain(committed_states, uncommitted_states))):
+    for idx, (search_group, group_state) in enumerate(zip(groups_list, chain(committed_states, uncommitted_states))):
         if group_state["shift"] is None:
             for group in reversed(groups_list[:idx]):
                 link_to = next((x for x in reversed(group) if not x.linked), None)
@@ -580,7 +543,7 @@ def run(args):
         src_script_path = args.script_file
     else:
         stype = src_demuxer.get_subs_type(args.src_script_idx)
-        src_script_path = format_full_path(args.temp_dir, args.source, '.sushi'+ stype)
+        src_script_path = format_full_path(args.temp_dir, args.source, '.sushi' + stype)
         src_demuxer.set_script(stream_idx=args.src_script_idx, output_path=src_script_path)
 
     script_extension = get_extension(src_script_path)
@@ -698,8 +661,8 @@ def run(args):
                 start_shift = g[0].shift
                 end_shift = g[-1].shift
                 avg_shift = average_shifts(g)
-                logging.info(u'Group (start: {0}, end: {1}, lines: {2}), '
-                             u'shifts (start: {3}, end: {4}, average: {5})'
+                logging.info('Group (start: {0}, end: {1}, lines: {2}), '
+                             'shifts (start: {3}, end: {4}, average: {5})'
                              .format(format_time(g[0].start), format_time(g[-1].end), len(g), start_shift, end_shift,
                                      avg_shift))
 
@@ -726,7 +689,7 @@ def run(args):
         script.save_to_file(dst_script_path)
 
         if write_plot:
-            plt.plot([x.shift + (x._start_shift + x._end_shift)/2.0 for x in events], label='After correction')
+            plt.plot([x.shift + (x._start_shift + x._end_shift) / 2.0 for x in events], label='After correction')
             plt.legend(fontsize=5, frameon=False, fancybox=False)
             plt.savefig(args.plot_path, dpi=300)
 
@@ -734,110 +697,3 @@ def run(args):
         if args.cleanup:
             src_demuxer.cleanup()
             dst_demuxer.cleanup()
-
-
-def create_arg_parser():
-    parser = argparse.ArgumentParser(description='Sushi - Automatic Subtitle Shifter')
-
-    parser.add_argument('--window', default=10, type=int, metavar='<size>', dest='window',
-                        help='Search window size. [%(default)s]')
-    parser.add_argument('--max-window', default=30, type=int, metavar='<size>', dest='max_window',
-                        help="Maximum search size Sushi is allowed to use when trying to recover from errors. [%(default)s]")
-    parser.add_argument('--rewind-thresh', default=5, type=int, metavar='<events>', dest='rewind_thresh',
-                        help="Number of consecutive errors Sushi has to encounter to consider results broken "
-                             "and retry with larger window. Set to 0 to disable. [%(default)s]")
-    parser.add_argument('--no-grouping', action='store_false', dest='grouping',
-                        help="Don't events into groups before shifting. Also disables error recovery.")
-    parser.add_argument('--max-kf-distance', default=2, type=float, metavar='<frames>', dest='max_kf_distance',
-                        help='Maximum keyframe snapping distance. [%(default)s]')
-    parser.add_argument('--kf-mode', default='all', choices=['shift', 'snap', 'all'], dest='kf_mode',
-                        help='Keyframes-based shift correction/snapping mode. [%(default)s]')
-    parser.add_argument('--smooth-radius', default=3, type=int, metavar='<events>', dest='smooth_radius',
-                        help='Radius of smoothing median filter. [%(default)s]')
-
-    # 10 frames at 23.976
-    parser.add_argument('--max-ts-duration', default=1001.0 / 24000.0 * 10, type=float, metavar='<seconds>',
-                        dest='max_ts_duration',
-                        help='Maximum duration of a line to be considered typesetting. [%(default).3f]')
-    # 10 frames at 23.976
-    parser.add_argument('--max-ts-distance', default=1001.0 / 24000.0 * 10, type=float, metavar='<seconds>',
-                        dest='max_ts_distance',
-                        help='Maximum distance between two adjacent typesetting lines to be merged. [%(default).3f]')
-
-    # deprecated/test options, do not use
-    parser.add_argument('--test-shift-plot', default=None, dest='plot_path', help=argparse.SUPPRESS)
-    parser.add_argument('--sample-type', default='uint8', choices=['float32', 'uint8'], dest='sample_type',
-                        help=argparse.SUPPRESS)
-
-    parser.add_argument('--sample-rate', default=12000, type=int, metavar='<rate>', dest='sample_rate',
-                        help='Downsampled audio sample rate. [%(default)s]')
-
-    parser.add_argument('--src-audio', default=None, type=int, metavar='<id>', dest='src_audio_idx',
-                        help='Audio stream index of the source video')
-    parser.add_argument('--src-script', default=None, type=int, metavar='<id>', dest='src_script_idx',
-                        help='Script stream index of the source video')
-    parser.add_argument('--dst-audio', default=None, type=int, metavar='<id>', dest='dst_audio_idx',
-                        help='Audio stream index of the destination video')
-    # files
-    parser.add_argument('--no-cleanup', action='store_false', dest='cleanup',
-                        help="Don't delete demuxed streams")
-    parser.add_argument('--temp-dir', default=None, dest='temp_dir', metavar='<string>',
-                        help='Specify temporary folder to use when demuxing stream.')
-    parser.add_argument('--chapters', default=None, dest='chapters_file', metavar='<filename>',
-                        help="XML or OGM chapters to use instead of any found in the source. 'none' to disable.")
-    parser.add_argument('--script', default=None, dest='script_file', metavar='<filename>',
-                        help='Subtitle file path to use instead of any found in the source')
-
-    parser.add_argument('--dst-keyframes', default=None, dest='dst_keyframes', metavar='<filename>',
-                        help='Destination keyframes file')
-    parser.add_argument('--src-keyframes', default=None, dest='src_keyframes', metavar='<filename>',
-                        help='Source keyframes file')
-    parser.add_argument('--dst-fps', default=None, type=float, dest='dst_fps', metavar='<fps>',
-                        help='Fps of the destination video. Must be provided if keyframes are used.')
-    parser.add_argument('--src-fps', default=None, type=float, dest='src_fps', metavar='<fps>',
-                        help='Fps of the source video. Must be provided if keyframes are used.')
-    parser.add_argument('--dst-timecodes', default=None, dest='dst_timecodes', metavar='<filename>',
-                        help='Timecodes file to use instead of making one from the destination (when possible)')
-    parser.add_argument('--src-timecodes', default=None, dest='src_timecodes', metavar='<filename>',
-                        help='Timecodes file to use instead of making one from the source (when possible)')
-
-    parser.add_argument('--src', required=True, dest="source", metavar='<filename>',
-                        help='Source audio/video')
-    parser.add_argument('--dst', required=True, dest="destination", metavar='<filename>',
-                        help='Destination audio/video')
-    parser.add_argument('-o', '--output', default=None, dest='output_script', metavar='<filename>',
-                        help='Output script')
-
-    parser.add_argument('-v', '--verbose', default=False, dest='verbose', action='store_true',
-                        help='Enable verbose logging')
-    parser.add_argument('--version', action='version', version=VERSION)
-
-    return parser
-
-
-def parse_args_and_run(cmd_keys):
-    def format_arg(arg):
-        return arg if ' ' not in arg else '"{0}"'.format(arg)
-
-    args = create_arg_parser().parse_args(cmd_keys)
-    handler = logging.StreamHandler()
-    if console_colors_supported and os.isatty(sys.stderr.fileno()):
-        # enable colors
-        handler.setFormatter(ColoredLogFormatter())
-    else:
-        handler.setFormatter(logging.Formatter(fmt=ColoredLogFormatter.default_format))
-    logging.root.addHandler(handler)
-    logging.root.setLevel(logging.DEBUG if args.verbose else logging.INFO)
-
-    logging.info("Sushi's running with arguments: {0}".format(' '.join(map(format_arg, cmd_keys))))
-    start_time = time.time()
-    run(args)
-    logging.info('Done in {0}s'.format(time.time() - start_time))
-
-
-if __name__ == '__main__':
-    try:
-        parse_args_and_run(sys.argv[1:])
-    except SushiError as e:
-        logging.critical(e.message)
-        sys.exit(2)

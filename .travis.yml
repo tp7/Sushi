@@ -1,16 +1,14 @@
+dist: bionic
 language: python
-
-virtualenv:
-  system_site_packages: true
-before_install:
- - sudo apt-get update
- - sudo apt-get install python-opencv
- - sudo dpkg -L python-opencv
- - sudo ln /dev/null /dev/raw1394
-install:
-  - "pip install -r requirements.txt"
-
 python:
-  - "2.7"
+  - 3.5
+  - 3.6
+  - 3.7
+  - 3.8
+
+install:
+  - pip install opencv-python-headless
+  - pip install -r requirements.txt
+
 script:
   - python run-tests.py

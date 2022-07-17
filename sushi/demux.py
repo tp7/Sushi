@@ -5,8 +5,8 @@ from collections import namedtuple
 import logging
 import bisect
 
-from common import SushiError, get_extension
-import chapters
+from .common import SushiError, get_extension
+from . import chapters
 
 MediaStreamInfo = namedtuple('MediaStreamInfo', ['id', 'info', 'default', 'title'])
 SubtitlesStreamInfo = namedtuple('SubtitlesStreamInfo', ['id', 'info', 'type', 'default', 'title'])
@@ -17,7 +17,9 @@ class FFmpeg(object):
     @staticmethod
     def get_info(path):
         try:
-            process = subprocess.Popen(['ffmpeg', '-hide_banner', '-i', path], stderr=subprocess.PIPE)
+            # text=True is an alias for universal_newlines since 3.7
+            process = subprocess.Popen(['ffmpeg', '-hide_banner', '-i', path], stderr=subprocess.PIPE,
+                                       universal_newlines=True, encoding='utf-8')
             out, err = process.communicate()
             process.wait()
             return err
@@ -75,7 +77,7 @@ class FFmpeg(object):
 
     @staticmethod
     def _get_chapters_times(info):
-        return map(float, re.findall(r'Chapter #0.\d+: start (\d+\.\d+)', info))
+        return list(map(float, re.findall(r'Chapter #0.\d+: start (\d+\.\d+)', info)))
 
     @staticmethod
     def _get_subtitles_streams(info):
@@ -113,10 +115,11 @@ class SCXviD(object):
     def make_keyframes(cls, video_path, log_path):
         try:
             ffmpeg_process = subprocess.Popen(['ffmpeg', '-i', video_path,
-                            '-f', 'yuv4mpegpipe',
-                            '-vf', 'scale=640:360',
-                            '-pix_fmt', 'yuv420p',
-                            '-vsync', 'drop', '-'], stdout=subprocess.PIPE)
+                                               '-f', 'yuv4mpegpipe',
+                                               '-vf', 'scale=640:360',
+                                               '-pix_fmt', 'yuv420p',
+                                               '-vsync', 'drop', '-'],
+                                              stdout=subprocess.PIPE)
         except OSError as e:
             if e.errno == 2:
                 raise SushiError("Couldn't invoke ffmpeg, check that it's installed")
@@ -143,7 +146,7 @@ class Timecodes(object):
             return self.times[number]
         except IndexError:
             if not self.default_frame_duration:
-                return self.get_frame_time(len(self.times)-1)
+                return self.get_frame_time(len(self.times) - 1)
             if self.times:
                 return self.times[-1] + (self.default_frame_duration) * (number - len(self.times) + 1)
             else:
@@ -157,7 +160,7 @@ class Timecodes(object):
     def get_frame_size(self, timestamp):
         try:
             number = bisect.bisect_left(self.times, timestamp)
-        except:
+        except Exception:
             return self.default_frame_duration
 
         c = self.get_frame_time(number)
@@ -353,4 +356,3 @@ class Demuxer(object):
             raise SushiError("Stream with index {0} doesn't exist in {1}.\n"
                              "Here are all that do:\n"
                              "{2}".format(chosen_idx, self._path, self._format_streams_list(streams)))
-

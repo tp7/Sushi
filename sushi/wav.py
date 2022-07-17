@@ -6,7 +6,9 @@ import struct
 import math
 from time import time
 import os.path
-from common import SushiError, clip
+
+from .common import SushiError, clip
+from functools import reduce
 
 WAVE_FORMAT_PCM = 0x0001
 WAVE_FORMAT_EXTENSIBLE = 0xFFFE
@@ -20,9 +22,9 @@ class DownmixedWavFile(object):
         self._file = open(path, 'rb')
         try:
             riff = Chunk(self._file, bigendian=False)
-            if riff.getname() != 'RIFF':
+            if riff.getname() != b'RIFF':
                 raise SushiError('File does not start with RIFF id')
-            if riff.read(4) != 'WAVE':
+            if riff.read(4) != b'WAVE':
                 raise SushiError('Not a WAVE file')
 
             fmt_chunk_read = False
@@ -35,10 +37,10 @@ class DownmixedWavFile(object):
                 except EOFError:
                     break
 
-                if chunk.getname() == 'fmt ':
+                if chunk.getname() == b'fmt ':
                     self._read_fmt_chunk(chunk)
                     fmt_chunk_read = True
-                elif chunk.getname() == 'data':
+                elif chunk.getname() == b'data':
                     if file_size > 0xFFFFFFFF:
                         # large broken wav
                         self.frames_count = (file_size - self._file.tell()) // self.frame_size
@@ -49,7 +51,7 @@ class DownmixedWavFile(object):
                 chunk.skip()
             if not fmt_chunk_read or not data_chink_read:
                 raise SushiError('Invalid WAV file')
-        except:
+        except Exception:
             self.close()
             raise
 
@@ -85,8 +87,8 @@ class DownmixedWavFile(object):
             if min_length != real_length:
                 logging.error("Length of audio channels didn't match. This might result in broken output")
 
-            channels = (unpacked[i::self.channels_count] for i in xrange(self.channels_count))
-            data = reduce(lambda a, b: a[:min_length]+b[:min_length], channels)
+            channels = (unpacked[i::self.channels_count] for i in range(self.channels_count))
+            data = reduce(lambda a, b: a[:min_length] + b[:min_length], channels)
             data /= float(self.channels_count)
             return data
 
@@ -126,7 +128,7 @@ class WavStream(object):
                 data = stream.readframes(int(self.READ_CHUNK_SIZE * stream.framerate))
                 new_length = int(round(len(data) * downsample_rate))
 
-                dst_view = self.data[0][samples_read:samples_read+new_length]
+                dst_view = self.data[0][samples_read:samples_read + new_length]
 
                 if downsample_rate != 1:
                     data = data.reshape((1, len(data)))
@@ -138,7 +140,7 @@ class WavStream(object):
 
             # padding the audio from both sides
             self.data[0][0:self.padding_size].fill(self.data[0][self.padding_size])
-            self.data[0][-self.padding_size:].fill(self.data[0][-self.padding_size-1])
+            self.data[0][-self.padding_size:].fill(self.data[0][-self.padding_size - 1])
 
             # normalizing
             # also clipping the stream by 3*median value from both sides of zero

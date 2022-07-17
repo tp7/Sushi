@@ -3,7 +3,7 @@ import os
 import re
 import collections
 
-from common import SushiError, format_time, format_srt_time
+from .common import SushiError, format_time, format_srt_time
 
 
 def _parse_ass_time(string):
@@ -79,9 +79,6 @@ class ScriptEventBase(object):
         assert not self.linked, 'Cannot adjust time of linked events'
         self._shift += value
 
-    def __repr__(self):
-        return unicode(self)
-
 
 class ScriptBase(object):
     def __init__(self, events):
@@ -95,7 +92,7 @@ class SrtEvent(ScriptEventBase):
     is_comment = False
     style = None
 
-    EVENT_REGEX = re.compile("""
+    EVENT_REGEX = re.compile(r"""
                                (\d+?)\s+? # line-number
                                (\d{1,2}:\d{1,2}:\d{1,2},\d+)\s-->\s(\d{1,2}:\d{1,2}:\d{1,2},\d+).  # timestamp
                                (.+?) # actual text
@@ -112,9 +109,9 @@ class SrtEvent(ScriptEventBase):
         end = cls.parse_time(match.group(3))
         return SrtEvent(int(match.group(1)), start, end, match.group(4).strip())
 
-    def __unicode__(self):
-        return u'{0}\n{1} --> {2}\n{3}'.format(self.source_index, self._format_time(self.start),
-                                               self._format_time(self.end), self.text)
+    def __str__(self):
+        return '{0}\n{1} --> {2}\n{3}'.format(self.source_index, self._format_time(self.start),
+                                              self._format_time(self.end), self.text)
 
     @staticmethod
     def parse_time(time_string):
@@ -142,7 +139,7 @@ class SrtScript(ScriptBase):
             raise SushiError("Script {0} not found".format(path))
 
     def save_to_file(self, path):
-        text = '\n\n'.join(map(unicode, self.events))
+        text = '\n\n'.join(map(str, self.events))
         with codecs.open(path, encoding='utf-8', mode='w') as script:
             script.write(text)
 
@@ -168,14 +165,14 @@ class AssEvent(ScriptEventBase):
         self.margin_vertical = split[7]
         self.effect = split[8]
 
-    def __unicode__(self):
-        return u'{0}: {1},{2},{3},{4},{5},{6},{7},{8},{9},{10}'.format(self.kind, self.layer,
-                                                                       self._format_time(self.start),
-                                                                       self._format_time(self.end),
-                                                                       self.style, self.name,
-                                                                       self.margin_left, self.margin_right,
-                                                                       self.margin_vertical, self.effect,
-                                                                       self.text)
+    def __str__(self):
+        return '{0}: {1},{2},{3},{4},{5},{6},{7},{8},{9},{10}'.format(self.kind, self.layer,
+                                                                      self._format_time(self.start),
+                                                                      self._format_time(self.end),
+                                                                      self.style, self.name,
+                                                                      self.margin_left, self.margin_right,
+                                                                      self.margin_vertical, self.effect,
+                                                                      self.text)
 
     @staticmethod
     def _format_time(seconds):
@@ -195,19 +192,19 @@ class AssScript(ScriptBase):
         other_sections = collections.OrderedDict()
 
         def parse_script_info_line(line):
-            if line.startswith(u'Format:'):
+            if line.startswith('Format:'):
                 return
             script_info.append(line)
 
         def parse_styles_line(line):
-            if line.startswith(u'Format:'):
+            if line.startswith('Format:'):
                 return
             styles.append(line)
 
         def parse_event_line(line):
-            if line.startswith(u'Format:'):
+            if line.startswith('Format:'):
                 return
-            events.append(AssEvent(line, position=len(events)+1))
+            events.append(AssEvent(line, position=len(events) + 1))
 
         def create_generic_parse(section_name):
             if section_name in other_sections:
@@ -224,11 +221,11 @@ class AssScript(ScriptBase):
                     if not line:
                         continue
                     low = line.lower()
-                    if low == u'[script info]':
+                    if low == '[script info]':
                         parse_function = parse_script_info_line
-                    elif low == u'[v4+ styles]':
+                    elif low == '[v4+ styles]':
                         parse_function = parse_styles_line
-                    elif low == u'[events]':
+                    elif low == '[events]':
                         parse_function = parse_event_line
                     elif re.match(r'\[.+?\]', low):
                         parse_function = create_generic_parse(line)
@@ -248,27 +245,27 @@ class AssScript(ScriptBase):
         #     raise RuntimeError('File %s already exists' % path)
         lines = []
         if self.script_info:
-            lines.append(u'[Script Info]')
+            lines.append('[Script Info]')
             lines.extend(self.script_info)
             lines.append('')
 
         if self.styles:
-            lines.append(u'[V4+ Styles]')
-            lines.append(u'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding')
+            lines.append('[V4+ Styles]')
+            lines.append('Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding')
             lines.extend(self.styles)
             lines.append('')
 
         if self.events:
             events = sorted(self.events, key=lambda x: x.source_index)
-            lines.append(u'[Events]')
-            lines.append(u'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
-            lines.extend(map(unicode, events))
+            lines.append('[Events]')
+            lines.append('Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text')
+            lines.extend(map(str, events))
 
         if self.other:
-            for section_name, section_lines in self.other.iteritems():
+            for section_name, section_lines in self.other.items():
                 lines.append('')
                 lines.append(section_name)
                 lines.extend(section_lines)
 
         with codecs.open(path, encoding='utf-8-sig', mode='w') as script:
-            script.write(unicode(os.linesep).join(lines))
+            script.write(str(os.linesep).join(lines))
